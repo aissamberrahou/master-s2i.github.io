@@ -1,0 +1,361 @@
+/* ==========================================================================
+   Noyau : stockage, authentification, utilitaires d'interface
+   ========================================================================== */
+const COLS = ["profs", "students", "contents", "sessions", "messages", "timetable", "exams", "soutenances", "modules", "notifications"];
+const DB_KEY = "s2i_db_v1";
+
+/* ---------------- Utilitaires ---------------- */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const pad = (n) => String(n).padStart(2, "0");
+const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayISO = () => isoDate(new Date());
+const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return isoDate(d); };
+const fmtDate = (s) => { if (!s) return ""; const [y, m, d] = s.slice(0, 10).split("-"); return `${d}/${m}/${y}`; };
+const fmtDateTime = (s) => { const d = new Date(s); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const yearOfModule = (code) => { const m = S2I.modules.find((x) => x.code === code); return m ? (m.sem <= 2 ? 1 : 2) : 1; };
+const sectionOf = (st) => `${st.formation}-${st.annee}A`;
+const sectionsOfYear = (y) => [`TN-${y}A`, `TAM-${y}A`];
+
+/* Semaines (lundi = début de semaine) et mode d'enseignement */
+const mondayOf = (iso) => { const d = iso ? new Date(iso + "T12:00:00") : new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return isoDate(d); };
+const shiftISO = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoDate(d); };
+const weekLabel = (mon) => `Semaine du ${fmtDate(mon)} au ${fmtDate(shiftISO(mon, 5))}`;
+const slotInWeek = (t, mon) => (t.semaine ? t.semaine === mon : !(t.exceptions || []).includes(mon));
+const TTWeek = { monday: mondayOf() };
+function weekOptions(selected) {
+  const base = mondayOf(); const set = new Set();
+  for (let i = -8; i <= 30; i++) set.add(shiftISO(base, 7 * i));
+  if (selected) set.add(selected);
+  return [["", "Toutes les semaines (récurrent)"], ...[...set].sort().map((w) => [w, weekLabel(w)])];
+}
+const MODES = { presentiel: "Présentiel", distance: "À distance" };
+function modePill(mode, lien) {
+  if (mode === "distance") return `<span class="pill mode-d">💻 À distance</span>${lien ? ` <a href="${esc(lien)}" target="_blank" rel="noopener">Rejoindre</a>` : ""}`;
+  return `<span class="pill mode-p">🏫 Présentiel</span>`;
+}
+
+async function sha256(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+const hashPwd = (pwd) => sha256("s2i-ensias::" + pwd);
+
+/* ---------------- Stockage ----------------
+   Mode local (par défaut) : localStorage du navigateur.
+   Mode partagé : Firebase Firestore si assets/js/firebase-config.js est rempli. */
+const Store = {
+  data: null,
+  mode: "local",
+  fs: null,
+
+  async init() {
+    const cfg = window.FIREBASE_CONFIG;
+    if (cfg && cfg.apiKey) {
+      try { await this._initFirebase(cfg); this.mode = "firebase"; return; }
+      catch (e) { console.error("Firebase indisponible, passage en mode local :", e); }
+    }
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) { this.data = JSON.parse(raw); this._ensure(); }
+    else { this.data = await buildSeed(); this._persist(); }
+  },
+
+  _ensure() { (this.data.timetable || []).forEach((t) => { if (!t.mode) t.mode = "presentiel"; if (t.semaine === undefined) t.semaine = ""; }); COLS.forEach((c) => { if (!Array.isArray(this.data[c])) this.data[c] = []; }); if (!this.data.settings) this.data.settings = {}; },
+  _persist() {
+    if (this.mode !== "local") return;
+    try { localStorage.setItem(DB_KEY, JSON.stringify(this.data)); }
+    catch (e) { UI.toast("Stockage du navigateur plein : utilisez des liens plutôt que des fichiers joints."); throw e; }
+  },
+
+  all(col) { return this.data[col] || []; },
+  get(col, id) { return this.all(col).find((x) => x.id === id); },
+  put(col, obj) {
+    if (!obj.id) obj.id = uid();
+    const arr = this.all(col); const i = arr.findIndex((x) => x.id === obj.id);
+    if (i >= 0) arr[i] = obj; else arr.push(obj);
+    this._persist();
+    if (this.mode === "firebase") this.fs.collection(col).doc(obj.id).set(JSON.parse(JSON.stringify(obj))).catch(Store._fbErr);
+    return obj;
+  },
+  del(col, id) {
+    this.data[col] = this.all(col).filter((x) => x.id !== id);
+    this._persist();
+    if (this.mode === "firebase") this.fs.collection(col).doc(id).delete().catch(Store._fbErr);
+  },
+  settings() { return this.data.settings; },
+  saveSettings() {
+    this._persist();
+    if (this.mode === "firebase") this.fs.collection("settings").doc("main").set(this.data.settings).catch(Store._fbErr);
+  },
+  exportJSON() { return JSON.stringify(this.data, null, 2); },
+  async importJSON(obj) {
+    this.data = obj; this._ensure(); this._persist();
+    if (this.mode === "firebase") await this._pushAll();
+  },
+  async reset() {
+    this.data = await buildSeed(); this._persist();
+    if (this.mode === "firebase") await this._pushAll();
+  },
+
+  _fbErr(e) { console.error(e); UI.toast("Erreur d'enregistrement en ligne : " + e.message); },
+  async _initFirebase(cfg) {
+    const v = "10.12.2";
+    await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-app-compat.js`);
+    await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore-compat.js`);
+    firebase.initializeApp(cfg);
+    this.fs = firebase.firestore();
+    this.data = { settings: {} };
+    for (const c of COLS) {
+      const snap = await this.fs.collection(c).get();
+      this.data[c] = snap.docs.map((d) => d.data());
+    }
+    const s = await this.fs.collection("settings").doc("main").get();
+    if (s.exists) this.data.settings = s.data();
+    if (!this.data.settings.adminHash) { this.data = await buildSeed(); await this._pushAll(); }
+  },
+  async _pushAll() {
+    for (const c of COLS) {
+      const snap = await this.fs.collection(c).get();
+      for (const d of snap.docs) await d.ref.delete();
+      for (const o of this.data[c]) await this.fs.collection(c).doc(o.id).set(JSON.parse(JSON.stringify(o)));
+    }
+    await this.fs.collection("settings").doc("main").set(this.data.settings);
+  }
+};
+
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+}
+
+async function buildSeed() {
+  const ph = await hashPwd(DEMO.studentPassword);
+  const pp = await hashPwd("prof2026");
+  const d = { settings: { adminHash: await hashPwd(DEMO.adminPassword), createdAt: new Date().toISOString() } };
+  d.modules = S2I.modules.map((m) => ({ id: m.code, ...m }));
+  d.profs = DEMO.profs.map(({ password, ...p }) => ({ ...p, passHash: pp }));
+  d.students = DEMO.students.map((s) => ({ ...s, passHash: ph }));
+  d.timetable = [
+    { id: uid(), section: "TN-1A", jour: 1, debut: "08:30", fin: "10:30", module: "M2.1", salle: "Salle B12", profId: "p1" },
+    { id: uid(), section: "TN-1A", jour: 1, debut: "10:45", fin: "12:45", module: "M2.2", salle: "Amphi 2", profId: "p1" },
+    { id: uid(), section: "TN-1A", jour: 3, debut: "14:00", fin: "16:00", module: "M2.5", salle: "Salle A04", profId: "" },
+    { id: uid(), section: "TN-1A", jour: 5, debut: "16:15", fin: "18:15", module: "M2.2", salle: "", profId: "p1", mode: "distance", lien: "https://teams.microsoft.com/", semaine: mondayOf() },
+    { id: uid(), section: "TAM-1A", jour: 6, debut: "09:00", fin: "12:00", module: "M2.1", salle: "Labo SE", profId: "p1" },
+    { id: uid(), section: "TN-2A", jour: 2, debut: "08:30", fin: "10:30", module: "M3.3", salle: "Labo Vision", profId: "p1" },
+    { id: uid(), section: "TN-2A", jour: 4, debut: "14:00", fin: "16:00", module: "M3.4", salle: "Salle C02", profId: "p2" }
+  ];
+  d.exams = [
+    { id: uid(), section: "TN-1A", module: "M2.1", date: addDays(21), debut: "09:00", fin: "11:00", salle: "Amphi 1", type: "Examen final" },
+    { id: uid(), section: "TN-2A", module: "M3.3", date: addDays(24), debut: "14:00", fin: "16:00", salle: "Amphi 2", type: "Examen final" }
+  ];
+  d.soutenances = [
+    { id: uid(), date: addDays(40), heure: "10:00", etudiant: "Imane Fassi (TN-2A)", sujet: "Détection de défauts par vision embarquée", encadrant: "Pr. A. Berrahou", jury: "À définir", salle: "Salle des soutenances" }
+  ];
+  d.contents = [
+    { id: uid(), module: "M2.1", type: "cours", titre: "Chapitre 1 : Architecture des microcontrôleurs", description: "Support de cours (diapositives).", lien: "", fichier: null, sections: ["TN-1A", "TAM-1A"], statut: "publie", dateLimite: "", profId: "p1", createdAt: new Date().toISOString() },
+    { id: uid(), module: "M2.1", type: "tp", titre: "TP1 : GPIO et interruptions", description: "Énoncé du TP1, à rendre en fin de séance.", lien: "", fichier: null, sections: ["TN-1A"], statut: "brouillon", dateLimite: "", profId: "p1", createdAt: new Date().toISOString() }
+  ];
+  d.messages = [
+    { id: uid(), module: "ALL", section: "ALL", authorRole: "admin", authorId: "admin", authorName: "Coordination S2I", text: "Bienvenue sur la plateforme du Master S2I, année " + S2I.annee + ".", system: false, date: new Date().toISOString() }
+  ];
+  d.timetable.forEach((t) => { t.mode = t.mode || "presentiel"; t.lien = t.lien || ""; t.semaine = t.semaine || ""; });
+  d.notifications = [
+    { id: uid(), titre: "Planning des examens du semestre", categorie: "Planning", message: "Le calendrier des examens est disponible dans l'onglet « Examens & soutenances ».", lien: "",
+      formation: "", promotions: [], annee: "", publishAt: new Date().toISOString(), createdAt: new Date().toISOString() }
+  ];
+  d.sessions = [];
+  return d;
+}
+
+/* ---------------- Authentification ---------------- */
+const Auth = {
+  KEY: "s2i_session",
+  async login(role, ident, pwd) {
+    const h = await hashPwd(pwd);
+    ident = (ident || "").trim().toLowerCase();
+    if (role === "admin") return h === Store.settings().adminHash ? { id: "admin", nom: "Administrateur", prenom: "" } : null;
+    const col = role === "prof" ? "profs" : "students";
+    const u = Store.all(col).find((x) => (x.login || "").toLowerCase() === ident && !x.inactif);
+    return u && u.passHash === h ? u : null;
+  },
+  start(role, user) { sessionStorage.setItem(this.KEY, JSON.stringify({ role, id: user.id })); },
+  current() { try { return JSON.parse(sessionStorage.getItem(this.KEY)); } catch { return null; } },
+  user() {
+    const s = this.current(); if (!s) return null;
+    if (s.role === "admin") return { id: "admin", nom: "Administrateur", prenom: "", role: "admin" };
+    const u = Store.get(s.role === "prof" ? "profs" : "students", s.id);
+    return u ? { ...u, role: s.role } : null;
+  },
+  require(role) {
+    const u = this.user();
+    if (!u || u.role !== role) { location.href = "connexion.html?role=" + (role === "student" ? "etudiant" : role); return null; }
+    return u;
+  },
+  logout() { sessionStorage.removeItem(this.KEY); location.href = "index.html"; }
+};
+
+/* ---------------- Interface ---------------- */
+const UI = {
+  toast(msg) {
+    document.querySelectorAll(".toast").forEach((x) => x.remove());
+    const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+    document.body.appendChild(t); setTimeout(() => t.remove(), 2800);
+  },
+  modal({ title, body, submitLabel = "Enregistrer", onSubmit, wide }) {
+    const bg = document.createElement("div"); bg.className = "modal-bg";
+    bg.innerHTML = `<form class="modal" ${wide ? 'style="max-width:980px"' : ""}>
+      <div class="modal-h"><h3>${esc(title)}</h3><button type="button" class="x" aria-label="Fermer">×</button></div>
+      <div class="modal-b">${body}</div>
+      <div class="modal-f"><button type="button" class="btn outline cancel">Fermer</button>${onSubmit ? `<button class="btn">${esc(submitLabel)}</button>` : ""}</div></form>`;
+    const close = () => bg.remove();
+    bg.querySelector(".x").onclick = close; bg.querySelector(".cancel").onclick = close;
+    bg.addEventListener("mousedown", (e) => { if (e.target === bg) close(); });
+    bg.querySelector("form").onsubmit = async (e) => { e.preventDefault(); if (!onSubmit) return; const ok = await onSubmit(bg.querySelector("form")); if (ok !== false) close(); };
+    document.body.appendChild(bg);
+    return bg;
+  },
+  confirm(msg) { return window.confirm(msg); },
+  moduleLabel(code) { const m = Store.get("modules", code) || S2I.modules.find((x) => x.code === code); return m ? `${m.code} – ${m.titre}` : code === "ALL" ? "Annonces générales" : code; },
+  moduleOptions(codes, sel) { return codes.map((c) => `<option value="${esc(c)}" ${c === sel ? "selected" : ""}>${esc(UI.moduleLabel(c))}</option>`).join(""); },
+  profName(id) { const p = Store.get("profs", id); return p ? `Pr. ${p.prenom} ${p.nom}` : "—"; },
+  studentName(s) { return `${s.nom.toUpperCase()} ${s.prenom}`; }
+};
+
+/* En-tête commun (logos + bandeau de navigation) */
+function renderHeader(active, user) {
+  const logo = (src, alt, cls = "") => `<img class="${cls}" src="${src}" alt="${alt}" onerror="this.outerHTML='<span class=&quot;logo-txt&quot;>${alt}</span>'">`;
+  const links = [["index.html", "Accueil"], ["index.html#programme", "Formation"], ["prof.html", "Espace Prof"], ["etudiant.html", "Espace Étudiant"], ["admin.html", "Administration"]];
+  document.getElementById("header").innerHTML = `
+  <div class="topbar"><div class="wrap">
+    <a class="logos" href="index.html">
+      ${logo("assets/img/logo-um5.png", "UM5")}<span class="sep"></span>
+      ${logo("assets/img/logo-ensias.png", "ENSIAS")}<span class="sep"></span>
+      <img class="logo-s2i" src="assets/img/logo-s2i.svg" alt="Master S2I">
+    </a>
+    <div class="right">${user ? `<span class="who-name">${esc((user.prenom ? user.prenom + " " : "") + user.nom)}</span><button class="btn outline sm" id="logout">Déconnexion</button>` : ""}</div>
+  </div></div>
+  <div class="navband"><nav>${links.map(([h, t]) => `<a href="${h}" class="${active === h ? "active" : ""}">${t}</a>`).join("")}</nav></div>`;
+  const lo = document.getElementById("logout"); if (lo) lo.onclick = () => Auth.logout();
+}
+
+function renderFooter() {
+  const el = document.getElementById("footer"); if (!el) return;
+  el.innerHTML = `<footer class="site"><div class="wrap">
+    <div>© ${new Date().getFullYear()} Master S2I — <a href="https://ensias.um5.ac.ma/" target="_blank" rel="noopener">ENSIAS</a>, Université Mohammed V de Rabat</div>
+    <div>Coordination : <a href="https://aissamberrahou.github.io/" target="_blank" rel="noopener">Pr. Aissam Berrahou</a></div></div></footer>`;
+}
+
+/* ---------------- Application à barre latérale ---------------- */
+function mountApp(user, roleLabel, views) {
+  const app = document.getElementById("app");
+  app.innerHTML = `<aside class="sidebar"><div class="who"><b>${esc((user.prenom ? user.prenom + " " : "") + user.nom)}</b><span>${esc(roleLabel)}</span></div>
+    ${views.map((v) => `<a href="#${v.id}" data-v="${v.id}"><span>${v.label}</span><span class="badge" data-badge="${v.id}" hidden></span></a>`).join("")}</aside>
+    <section class="main" id="main"></section>`;
+  const show = () => {
+    const id = location.hash.slice(1) || views[0].id;
+    const v = views.find((x) => x.id === id) || views[0];
+    $$(".sidebar a").forEach((a) => a.classList.toggle("active", a.dataset.v === v.id));
+    const main = $("#main"); main.innerHTML = "";
+    v.render(main);
+    refreshBadges(views);
+  };
+  window.addEventListener("hashchange", show);
+  show();
+}
+function refreshBadges(views) {
+  views.forEach((v) => {
+    if (!v.badge) return; const n = v.badge(); const b = document.querySelector(`[data-badge="${v.id}"]`);
+    if (b) { b.hidden = !n; b.textContent = n; }
+  });
+}
+
+/* ---------------- Calendrier mensuel générique ---------------- */
+function renderMonthCalendar(el, events, state = { y: new Date().getFullYear(), m: new Date().getMonth() }) {
+  const draw = () => {
+    const { y, m } = state;
+    const first = new Date(y, m, 1); const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
+    const mois = first.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    let cells = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((d) => `<div class="dow">${d}</div>`).join("");
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i); const iso = isoDate(d);
+      const evs = events.filter((e) => e.date === iso).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+      cells += `<div class="${d.getMonth() !== m ? "out" : ""} ${iso === todayISO() ? "today" : ""}"><span class="num">${d.getDate()}</span>
+        ${evs.map((e) => `<span class="ev ${e.cls || ""}" title="${esc(e.title)}">${esc((e.time ? e.time + " " : "") + e.label)}</span>`).join("")}</div>`;
+    }
+    el.innerHTML = `<div class="cal-head"><button class="btn outline sm" data-n="-1">‹</button><h3>${mois}</h3><button class="btn outline sm" data-n="1">›</button>
+      <button class="btn outline sm" data-n="0">Aujourd'hui</button></div><div class="cal">${cells}</div>`;
+    $$("[data-n]", el).forEach((b) => b.onclick = () => {
+      const n = +b.dataset.n;
+      if (n === 0) { state.y = new Date().getFullYear(); state.m = new Date().getMonth(); }
+      else { const d = new Date(state.y, state.m + n, 1); state.y = d.getFullYear(); state.m = d.getMonth(); }
+      draw();
+    });
+  };
+  draw();
+}
+
+/* ---------------- Formulaires et tableaux génériques (CRUD) ---------------- */
+function fieldHtml(f, val) {
+  const id = "f_" + f.key; const req = f.required ? "required" : "";
+  const cls = f.full ? "full" : "";
+  let input;
+  switch (f.type) {
+    case "select":
+      if (typeof val === "boolean") val = val ? "1" : "0";
+      input = `<select id="${id}" name="${f.key}" ${req}>${f.empty ? `<option value="">${esc(f.empty)}</option>` : ""}${f.options().map(([v, t]) => `<option value="${esc(v)}" ${String(val ?? "") === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`; break;
+    case "multi":
+      input = `<div class="checks" id="${id}">${f.options().map(([v, t]) => `<label><input type="checkbox" name="${f.key}" value="${esc(v)}" ${(val || []).includes(v) ? "checked" : ""}> ${esc(t)}</label>`).join("")}</div>`; break;
+    case "textarea": input = `<textarea id="${id}" name="${f.key}" ${req}>${esc(val)}</textarea>`; break;
+    case "password": input = `<input id="${id}" name="${f.key}" type="password" autocomplete="new-password" placeholder="${f.placeholder || ""}" ${req}>`; break;
+    default: input = `<input id="${id}" name="${f.key}" type="${f.type || "text"}" value="${esc(val)}" placeholder="${esc(f.placeholder || "")}" ${f.datalist ? `list="dl_${f.key}"` : ""} ${req}>`
+      + (f.datalist ? `<datalist id="dl_${f.key}">${f.datalist().map((o) => `<option value="${esc(o)}">`).join("")}</datalist>` : "");
+  }
+  return `<div class="${cls}"><label for="${id}">${esc(f.label)}</label>${input}${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ""}</div>`;
+}
+function readForm(form, fields) {
+  const o = {};
+  fields.forEach((f) => {
+    if (f.type === "multi") o[f.key] = $$(`input[name="${f.key}"]:checked`, form).map((i) => i.value);
+    else { const el = form.elements[f.key]; o[f.key] = el ? el.value.trim() : ""; }
+    if (f.type === "number" && o[f.key] !== "") o[f.key] = Number(o[f.key]);
+  });
+  return o;
+}
+
+/* cfg : { col, title, fields, columns:[[label, fn(row)]], sort, beforeSave(obj, isNew), filter } */
+function renderCrud(el, cfg) {
+  const draw = () => {
+    let rows = Store.all(cfg.col).slice();
+    if (cfg.filter) rows = rows.filter(cfg.filter);
+    if (cfg.sort) rows.sort(cfg.sort);
+    el.innerHTML = `<div class="page-head"><h1>${esc(cfg.title)}</h1><div class="toolbar">${cfg.extraButtons || ""}<button class="btn" data-add>+ Ajouter</button></div></div>
+      <div class="table-scroll"><table class="data"><thead><tr>${cfg.columns.map((c) => `<th>${esc(c[0])}</th>`).join("")}<th></th></tr></thead>
+      <tbody>${rows.length ? rows.map((r) => `<tr>${cfg.columns.map((c) => `<td>${c[1](r)}</td>`).join("")}
+        <td class="actions">${cfg.rowActions ? cfg.rowActions(r) : ""}<button class="btn outline sm" data-edit="${r.id}">Modifier</button> <button class="btn danger sm" data-del="${r.id}">Supprimer</button></td></tr>`).join("")
+        : `<tr><td colspan="${cfg.columns.length + 1}" class="empty">Aucun élément.</td></tr>`}</tbody></table></div>`;
+    $("[data-add]", el).onclick = () => openForm(null);
+    $$("[data-edit]", el).forEach((b) => b.onclick = () => openForm(Store.get(cfg.col, b.dataset.edit)));
+    $$("[data-del]", el).forEach((b) => b.onclick = () => { if (UI.confirm("Supprimer cet élément ?")) { Store.del(cfg.col, b.dataset.del); UI.toast("Supprimé."); draw(); } });
+    if (cfg.afterDraw) cfg.afterDraw(el, draw);
+  };
+  const openForm = (row) => {
+    const isNew = !row; row = row ? { ...row } : { ...(cfg.defaults ? cfg.defaults() : {}) };
+    UI.modal({
+      title: (isNew ? "Ajouter — " : "Modifier — ") + cfg.title,
+      body: `<div class="form-grid">${cfg.fields.map((f) => fieldHtml(f, row[f.key])).join("")}</div>`,
+      onSubmit: async (form) => {
+        const vals = readForm(form, cfg.fields);
+        const obj = { ...row, ...vals };
+        if (cfg.beforeSave) { const r = await cfg.beforeSave(obj, isNew); if (r === false) return false; }
+        Store.put(cfg.col, obj); UI.toast("Enregistré."); draw();
+      }
+    });
+  };
+  draw();
+}
+
+function downloadFile(name, text, type = "application/json") {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
