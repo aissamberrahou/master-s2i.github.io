@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<title>Master S2I — Systèmes Industriels Intelligents | ENSIAS</title>
+<meta name="description" content="Master Systèmes Industriels Intelligents (S2I) — ENSIAS, Université Mohammed V de Rabat. Présentation de la formation et espaces enseignants, étudiants et administration.">
+</head>
+<body>
+<div id="header"></div>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">ENSIAS · Université Mohammed V de Rabat</div>
+    <h1>Master Systèmes Industriels Intelligents (S2I)</h1>
+    <p>Une formation de deux ans au croisement de l'intelligence artificielle, des systèmes embarqués, de la robotique et de l'Industrie 4.0.</p>
+    <div class="cta">
+      <a class="btn light" href="#programme">Découvrir le programme</a>
+      <a class="btn ghost" href="#espaces">Accéder à mon espace</a>
+    </div>
+    <div class="kpis"><div><b>4</b><span>semestres</span></div><div><b>21</b><span>modules</span></div><div><b>1</b><span>PFE en S4</span></div><div><b>TN · TAM</b><span>deux formules</span></div></div>
+  </div>
+  <span class="credit">Photo : ENSIAS</span>
+</section>
+
+<section class="section" id="presentation">
+  <h2>Présentation de la formation</h2>
+  <p class="lead">Offre de formation <span class="annee"></span></p>
+  <div class="grid grid-3">
+    <div class="card accent"><h3>Objectif</h3><p>Former des cadres capables de concevoir, programmer et déployer des systèmes industriels intelligents : acquisition de données, commande, IA embarquée, vision, IoT et jumeaux numériques.</p></div>
+    <div class="card accent"><h3>Compétences visées</h3><p>Programmation avancée et embarquée, modélisation et simulation, data science, apprentissage profond, robotique, cybersécurité, cloud et DevOps, conception de systèmes (Design Thinking, UML/SysML).</p></div>
+    <div class="card accent"><h3>Organisation</h3><p>Trois semestres de modules (techniques, langue et soft skills), puis un semestre consacré au projet de fin d'études. Deux formules : formation initiale (TN) et formation à temps aménagé (TAM).</p></div>
+  </div>
+</section>
+
+<section class="section-alt"><div class="section" id="programme">
+  <h2>Programme</h2>
+  <p class="lead">Msc S2I : Systèmes Industriels Intelligents — répartition des modules par semestre.</p>
+  <div class="table-scroll"><table class="prog" id="prog"></table></div>
+  <div class="legend"><span><i style="background:#fff"></i>Module technique</span><span><i style="background:#f2f2f2"></i>Langue</span><span><i style="background:#fff1c2"></i>Soft skills</span><span><i style="background:#fbd5da"></i>Projet de fin d'études</span></div>
+</div></section>
+
+<section class="section" id="espaces">
+  <h2>Espaces de la plateforme</h2>
+  <p class="lead">Chaque espace est protégé par un identifiant et un mot de passe.</p>
+  <div class="grid grid-3">
+    <div class="card space-card"><div class="ico">👨‍🏫</div><h3>Espace Professeur</h3>
+      <ul><li>Saisie des absences (TN et TAM)</li><li>Cours, TD, TP et devoirs : ajouter, modifier, supprimer, publier, désactiver</li><li>Notification des étudiants par messagerie</li><li>Emploi du temps et calendrier des examens</li></ul>
+      <a class="btn" href="prof.html">Accéder</a></div>
+    <div class="card space-card"><div class="ico">🎓</div><h3>Espace Étudiant</h3>
+      <ul><li>Contenus pédagogiques publiés</li><li>Suivi de ses absences</li><li>Emploi du temps et notifications</li><li>Calendrier des examens et des soutenances</li></ul>
+      <a class="btn" href="etudiant.html">Accéder</a></div>
+    <div class="card space-card"><div class="ico">⚙️</div><h3>Espace Administrateur</h3>
+      <ul><li>Accès complet à la plateforme</li><li>Étudiants, enseignants et modules</li><li>Emploi du temps, examens et soutenances</li><li>Sauvegarde et restauration des données</li></ul>
+      <a class="btn" href="admin.html">Accéder</a></div>
+  </div>
+</section>
+
+<section class="section-alt"><div class="section" id="contact">
+  <h2>Contact</h2>
+  <div class="grid grid-3">
+    <div class="card"><h3>Coordination</h3><p>Pr. Aissam Berrahou<br>Département Ingénierie des Systèmes Embarqués<br><a href="https://aissamberrahou.github.io/" target="_blank" rel="noopener">aissamberrahou.github.io</a></p></div>
+    <div class="card"><h3>Établissement</h3><p>École Nationale Supérieure d'Informatique et d'Analyse des Systèmes (ENSIAS)<br>Université Mohammed V de Rabat<br><a href="https://ensias.um5.ac.ma/" target="_blank" rel="noopener">ensias.um5.ac.ma</a></p></div>
+    <div class="card"><h3>Année universitaire</h3><p><span class="annee"></span><br>Offre de formation du Master S2I.</p></div>
+  </div>
+</div></section>
+
+<div id="footer"></div>
+<script src="assets/js/firebase-config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/core.js"></script>
+<script>
+renderHeader("index.html", null); renderFooter();
+document.querySelectorAll(".annee").forEach((e) => (e.textContent = S2I.annee));
+(function () {
+  const cell = (m) => `<td class="mod ${m.cat}"><span class="code">${m.code}</span>${esc(m.titre)}</td>`;
+  const by = (s) => S2I.modules.filter((m) => m.sem === s);
+  const sem = (s, yearCell = "") => `<tr class="sem">${yearCell}<td colspan="7">Semestre ${s}</td></tr>`;
+  const mods = (s) => `<tr>${by(s).map(cell).join("")}</tr>`;
+  document.getElementById("prog").innerHTML =
+    `<tr><td class="year" rowspan="5">1<sup>re</sup> année</td><td colspan="7" style="text-align:center;font-family:var(--serif);font-size:18px;color:var(--navy)">Msc S2I : Systèmes Industriels Intelligents</td></tr>`
+    + sem(1) + mods(1) + sem(2) + mods(2)
+    + sem(3, `<td class="year" rowspan="4">2<sup>e</sup> année</td>`) + mods(3)
+    + sem(4) + `<tr><td class="mod pfe" colspan="7">Projet de fin d'études (PFE)</td></tr>`;
+})();
+</script>
+</body>
+</html>

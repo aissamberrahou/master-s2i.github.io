@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<title>Connexion — Master S2I</title>
+</head>
+<body>
+<div id="header"></div>
+<div class="login-wrap">
+  <form class="login-box" id="login">
+    <h1>Connexion</h1>
+    <div class="muted">Plateforme du Master S2I — ENSIAS</div>
+    <div class="role-tabs">
+      <button type="button" data-r="prof">Professeur</button>
+      <button type="button" data-r="etudiant">Étudiant</button>
+      <button type="button" data-r="admin">Administrateur</button>
+    </div>
+    <div class="field" id="f-ident"><label for="ident" id="ident-l">Identifiant</label><input id="ident" autocomplete="username"></div>
+    <div class="field"><label for="pwd">Mot de passe</label><input id="pwd" type="password" required autocomplete="current-password"></div>
+    <div class="err" id="err"></div>
+    <button class="btn" style="width:100%;justify-content:center">Se connecter</button>
+    <p class="hint" id="demo"></p>
+  </form>
+</div>
+<div id="footer"></div>
+<script src="assets/js/firebase-config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/components.js"></script>
+<script>
+(async () => {
+  renderHeader("", null); renderFooter();
+  await Store.init();
+  const params = new URLSearchParams(location.search);
+  let role = ["prof", "etudiant", "admin"].includes(params.get("role")) ? params.get("role") : "prof";
+  const labels = { prof: "Identifiant enseignant", etudiant: "Code étudiant", admin: "" };
+  const setRole = (r) => {
+    role = r;
+    document.querySelectorAll("[data-r]").forEach((b) => b.classList.toggle("active", b.dataset.r === r));
+    document.getElementById("f-ident").hidden = r === "admin";
+    document.getElementById("ident-l").textContent = labels[r];
+    document.getElementById("err").textContent = "";
+    document.getElementById("demo").innerHTML = Store.settings().demoHidden ? "" :
+      "Comptes de démonstration — prof : <b>aberrahou</b> / prof2026 · étudiant : <b>S2I-TN1-01</b> / etud2026 · admin : admin2026. À changer depuis l'administration.";
+  };
+  document.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => setRole(b.dataset.r)));
+  setRole(role);
+  document.getElementById("login").onsubmit = async (e) => {
+    e.preventDefault();
+    const authRole = role === "etudiant" ? "student" : role;
+    const u = await Auth.login(authRole, document.getElementById("ident").value, document.getElementById("pwd").value);
+    if (!u) { document.getElementById("err").textContent = "Identifiant ou mot de passe incorrect."; return; }
+    Auth.start(authRole, u);
+    location.href = { prof: "prof.html", etudiant: "etudiant.html", admin: "admin.html" }[role];
+  };
+})();
+</script>
+</body>
+</html>

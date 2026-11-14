@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<title>Administration — Master S2I</title>
+</head>
+<body>
+<div id="header"></div>
+<div class="app" id="app"></div>
+<script src="assets/js/firebase-config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/components.js"></script>
+<script src="assets/js/excel.js"></script>
+<script src="assets/js/admin-students.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script>
+(async () => {
+  await Store.init();
+  const user = Auth.require("admin"); if (!user) return;
+  renderHeader("admin.html", user);
+  const ctxUser = { ...user, role: "admin" };
+  const allMods = () => Store.all("modules").slice().sort((a, b) => a.sem - b.sem || a.code.localeCompare(b.code, "fr", { numeric: true })).map((m) => m.code);
+  const modOpts = () => allMods().map((c) => [c, UI.moduleLabel(c)]);
+  const secOpts = () => S2I.sections.map((s) => [s, s]);
+  const profOpts = () => Store.all("profs").map((p) => [p.id, `Pr. ${p.prenom} ${p.nom}`]);
+  const channels = () => [{ module: "ALL", section: "ALL" }, ...allMods().filter((c) => c !== "PFE").flatMap((c) => sectionsOfYear(yearOfModule(c)).map((s) => ({ module: c, section: s })))];
+
+  const uniqueLogin = (col) => (obj) => {
+    const dup = Store.all(col).find((x) => x.id !== obj.id && (x.login || "").toLowerCase() === obj.login.toLowerCase());
+    if (dup) { UI.toast("Cet identifiant existe déjà."); return false; } return true;
+  };
+  const withPassword = (col) => async (obj, isNew) => {
+    if (!uniqueLogin(col)(obj)) return false;
+    if (obj.password) obj.passHash = await hashPwd(obj.password);
+    else if (isNew) { UI.toast("Indiquez un mot de passe initial."); return false; }
+    delete obj.password;
+    if (col === "students") obj.annee = Number(obj.annee);
+    obj.inactif = obj.inactif === "1";
+  };
+  const actifField = { key: "inactif", label: "Compte", type: "select", options: () => [["0", "Actif"], ["1", "Désactivé"]] };
+
+  const views = [
+    { id: "accueil", label: "Tableau de bord", render: (el) => {
+      const st = Store.all("students");
+      el.innerHTML = `<div class="page-head"><h1>Administration du Master S2I</h1><span class="muted">Mode de stockage : <b>${Store.mode === "firebase" ? "Firebase (partagé)" : "local (démonstration)"}</b></span></div>
+        <div class="grid grid-4" style="margin-bottom:24px">
+          ${S2I.sections.map((s) => `<div class="stat"><b>${st.filter((x) => sectionOf(x) === s).length}</b><span>Étudiants ${s}</span></div>`).join("")}
+          <div class="stat"><b>${Store.all("profs").length}</b><span>Enseignants</span></div>
+          <div class="stat"><b>${Store.all("sessions").length}</b><span>Séances d'appel</span></div>
+          <div class="stat"><b>${Store.all("contents").length}</b><span>Contenus pédagogiques</span></div>
+          <div class="stat"><b>${Store.all("exams").length + Store.all("soutenances").length}</b><span>Examens & soutenances</span></div></div>
+        ${Store.mode === "local" ? `<div class="alert warn">Mode démonstration : les données sont enregistrées dans ce navigateur uniquement. Pour partager les données entre enseignants et étudiants, configurez Firebase (voir README du dépôt). Pensez aussi à changer les mots de passe de démonstration (onglet Paramètres).</div>` : ""}`;
+    }},
+    { id: "etudiants", label: "Étudiants", render: (el) => StudentsAdmin(el, { actifField, withPassword }) },
+    { id: "enseignants", label: "Enseignants", render: (el) => renderCrud(el, {
+      col: "profs", title: "Enseignants", sort: (a, b) => a.nom.localeCompare(b.nom),
+      columns: [["Identifiant", (r) => esc(r.login)], ["Nom", (r) => `Pr. ${esc(r.prenom)} ${esc(r.nom)}`], ["Modules", (r) => (r.modules || []).map((m) => `<span class="pill sec">${m}</span>`).join(" ")], ["Compte", (r) => r.inactif ? '<span class="pill off">Désactivé</span>' : '<span class="pill pub">Actif</span>']],
+      fields: [
+        { key: "login", label: "Identifiant", required: true }, { key: "email", label: "E-mail", type: "email" },
+        { key: "nom", label: "Nom", required: true }, { key: "prenom", label: "Prénom", required: true },
+        { key: "password", label: "Mot de passe", type: "password", placeholder: "Laisser vide pour ne pas changer" }, actifField,
+        { key: "modules", label: "Modules enseignés", type: "multi", full: true, options: modOpts }],
+      beforeSave: withPassword("profs")
+    }) },
+    { id: "modules", label: "Modules", render: (el) => renderCrud(el, {
+      col: "modules", title: "Modules de la formation",
+      sort: (a, b) => a.sem - b.sem || a.code.localeCompare(b.code, "fr", { numeric: true }),
+      columns: [["Code", (r) => `<b>${esc(r.code)}</b>`], ["Intitulé", (r) => esc(r.titre)], ["Semestre", (r) => "S" + r.sem], ["Catégorie", (r) => ({ tech: "Technique", lang: "Langue", soft: "Soft skills", pfe: "PFE" }[r.cat])], ["Enseignant(s)", (r) => Store.all("profs").filter((p) => (p.modules || []).includes(r.code)).map((p) => esc(`Pr. ${p.nom}`)).join(", ") || "—"]],
+      fields: [{ key: "code", label: "Code", required: true }, { key: "sem", label: "Semestre", type: "select", options: () => [["1", "S1"], ["2", "S2"], ["3", "S3"], ["4", "S4"]] },
+        { key: "cat", label: "Catégorie", type: "select", options: () => [["tech", "Technique"], ["lang", "Langue"], ["soft", "Soft skills"], ["pfe", "PFE"]] },
+        { key: "titre", label: "Intitulé", required: true, full: true }],
+      beforeSave: (o, isNew) => { o.sem = Number(o.sem); if (isNew) { if (Store.get("modules", o.code)) { UI.toast("Ce code existe déjà."); return false; } o.id = o.code; } else if (o.code !== o.id) { UI.toast("Le code d'un module existant ne peut pas être modifié."); return false; } }
+    }) },
+    { id: "absences", label: "Absences", render: (el) => AttendanceView(el, { modules: allMods().filter((c) => c !== "PFE"), profId: null }) },
+    { id: "contenus", label: "Contenus pédagogiques", render: (el) => ContentsView(el, { modules: allMods(), profId: null, user }) },
+    { id: "notifications", label: "Notifications (Planning)", render: (el) => NotificationsAdmin(el) },
+    { id: "messagerie", label: "Messagerie", badge: () => Chat.totalUnread(ctxUser, channels()), render: (el) => ChatView(el, { user: ctxUser, role: "admin", channels: channels(), onRead: () => refreshBadges(views) }) },
+    { id: "edt", label: "Emploi du temps", render: (el) => {
+      el.innerHTML = `<div id="tt-view"></div><div id="tt-crud" style="margin-top:30px"></div>`;
+      const ttState = window.ttState || (window.ttState = { all: false });
+      const sortTT = (a, b) => a.section.localeCompare(b.section) || a.jour - b.jour || a.debut.localeCompare(b.debut);
+      const drawView = () => TimetableView(el.querySelector("#tt-view"), { sections: S2I.sections, title: "Emploi du temps par semaine", onWeek: () => drawCrud() });
+      const drawCrud = () => renderCrud(el.querySelector("#tt-crud"), {
+        col: "timetable", title: ttState.all ? "Tous les créneaux" : `Créneaux — ${weekLabel(TTWeek.monday)}`,
+        filter: (t) => ttState.all || slotInWeek(t, TTWeek.monday) || (!t.semaine && (t.exceptions || []).includes(TTWeek.monday)),
+        extraButtons: `<button class="btn outline" data-ttall>${ttState.all ? "Semaine affichée seulement" : "Voir tous les créneaux"}</button><button class="btn outline" data-ttdup>Dupliquer la semaine</button><button class="btn outline" data-ttimp>Importer Excel</button><button class="btn outline" data-ttexp>Exporter Excel</button>`,
+        sort: sortTT,
+        columns: [["Section", (r) => `<span class="pill sec">${r.section}</span>`], ["Semaine", (r) => r.semaine ? `${fmtDate(r.semaine)}` : (r.exceptions || []).includes(TTWeek.monday) ? '<span class="pill off">Annulée cette semaine</span>' : '<span class="muted">Récurrent</span>'],
+          ["Jour", (r) => S2I.jours[r.jour - 1]], ["Horaire", (r) => `${r.debut} – ${r.fin}`], ["Module", (r) => esc(r.module)], ["Mode", (r) => modePill(r.mode, r.lien)], ["Salle", (r) => esc(r.salle || "—")], ["Enseignant", (r) => esc(UI.profName(r.profId))]],
+        rowActions: (r) => !r.semaine && !ttState.all ? `<button class="btn outline sm" data-ttskip="${r.id}">${(r.exceptions || []).includes(TTWeek.monday) ? "Rétablir cette semaine" : "Annuler cette semaine"}</button> ` : "",
+        fields: [{ key: "section", label: "Section", type: "select", options: secOpts }, { key: "semaine", label: "Semaine", type: "select", options: () => weekOptions(TTWeek.monday) },
+          { key: "jour", label: "Jour", type: "select", options: () => S2I.jours.map((j, i) => [String(i + 1), j]) },
+          { key: "debut", label: "Début", type: "time", required: true }, { key: "fin", label: "Fin", type: "time", required: true },
+          { key: "module", label: "Module", type: "select", options: modOpts }, { key: "profId", label: "Enseignant", type: "select", empty: "—", options: profOpts },
+          { key: "mode", label: "Mode d'enseignement", type: "select", options: () => Object.entries(MODES) },
+          { key: "salle", label: "Salle (présentiel)" }, { key: "lien", label: "Lien de la séance (à distance)", type: "url", placeholder: "https://teams.microsoft.com/…", full: true }],
+        defaults: () => ({ debut: "08:30", fin: "10:30", mode: "presentiel", semaine: "" }),
+        beforeSave: (o) => { o.jour = Number(o.jour); if (o.fin <= o.debut) { UI.toast("L'heure de fin doit suivre l'heure de début."); return false; }
+          if (o.mode === "presentiel" && !o.salle) { UI.toast("Indiquez la salle pour une séance en présentiel."); return false; } },
+        afterDraw: (box, redraw) => {
+          drawView();
+          box.querySelector("[data-ttall]").onclick = () => { ttState.all = !ttState.all; drawCrud(); };
+          $$("[data-ttskip]", box).forEach((b) => b.onclick = () => { const t = Store.get("timetable", b.dataset.ttskip); const ex = new Set(t.exceptions || []);
+            ex.has(TTWeek.monday) ? ex.delete(TTWeek.monday) : ex.add(TTWeek.monday); t.exceptions = [...ex]; Store.put("timetable", t); drawCrud(); });
+          box.querySelector("[data-ttimp]").onclick = () => importTimetableDialog(() => drawCrud());
+          box.querySelector("[data-ttdup]").onclick = () => UI.modal({
+            title: "Dupliquer la semaine — " + weekLabel(TTWeek.monday), submitLabel: "Dupliquer",
+            body: `<div class="form-grid"><div class="full"><label>Copier vers</label><select name="to">${weekOptions().filter(([w]) => w && w !== TTWeek.monday).map(([w, l]) => `<option value="${w}" ${w === shiftISO(TTWeek.monday, 7) ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+              <div class="full"><label>Sections</label><div class="checks">${S2I.sections.map((s) => `<label><input type="checkbox" name="sec" value="${s}" checked> ${s}</label>`).join("")}</div></div>
+              <div class="full checks"><label><input type="checkbox" name="rec"> Inclure aussi les séances récurrentes (copiées comme séances ponctuelles, modifiables pour cette semaine seulement)</label></div></div>
+              <p class="muted">Seules les séances ponctuelles de la semaine affichée sont copiées par défaut ; les séances récurrentes apparaissent déjà chaque semaine.</p>`,
+            onSubmit: (f) => { const secs = $$('input[name="sec"]:checked', f).map((i) => i.value);
+              const src = Store.all("timetable").filter((t) => secs.includes(t.section) && (t.semaine === TTWeek.monday || (f.rec.checked && !t.semaine && slotInWeek(t, TTWeek.monday))));
+              src.forEach((orig) => { const { id, exceptions, ...t } = orig;
+                if (!orig.semaine) { orig.exceptions = [...new Set([...(orig.exceptions || []), f.to.value])]; Store.put("timetable", orig); }
+                Store.put("timetable", { ...t, semaine: f.to.value }); });
+              UI.toast(`${src.length} séance(s) copiée(s) vers la ${weekLabel(f.to.value).toLowerCase()}.`); drawCrud(); } });
+          box.querySelector("[data-ttexp]").onclick = () => {
+            const rows = Store.all("timetable").filter((t) => ttState.all || slotInWeek(t, TTWeek.monday)).sort(sortTT);
+            Excel.download(`emploi_du_temps_S2I_${ttState.all ? "complet" : TTWeek.monday}.xlsx`, [{ name: "EDT", widths: [10, 12, 12, 8, 8, 10, 40, 12, 16, 22, 30],
+              rows: [["Section", "Semaine", "Jour", "Début", "Fin", "Module", "Intitulé", "Mode", "Salle", "Enseignant", "Lien"], ...rows.map((t) => [t.section, t.semaine ? fmtDate(t.semaine) : "Récurrent", S2I.jours[t.jour - 1], t.debut, t.fin, t.module,
+                (Store.get("modules", t.module) || {}).titre || "", MODES[t.mode] || "Présentiel", t.salle || "", t.profId ? UI.profName(t.profId) : "", t.lien || ""])] }]);
+          };
+        }
+      });
+      drawCrud();
+    }},
+    { id: "examens", label: "Examens", render: (el) => renderCrud(el, {
+      col: "exams", title: "Calendrier des examens", sort: (a, b) => (a.date + a.debut).localeCompare(b.date + b.debut),
+      columns: [["Date", (r) => fmtDate(r.date)], ["Horaire", (r) => `${r.debut} – ${r.fin}`], ["Section", (r) => `<span class="pill sec">${r.section}</span>`], ["Module", (r) => esc(r.module)], ["Type", (r) => esc(r.type)], ["Salle", (r) => esc(r.salle)]],
+      fields: [{ key: "section", label: "Section", type: "select", options: secOpts }, { key: "module", label: "Module", type: "select", options: modOpts },
+        { key: "type", label: "Type", type: "select", options: () => ["Contrôle continu", "Examen final", "Rattrapage"].map((x) => [x, x]) },
+        { key: "date", label: "Date", type: "date", required: true }, { key: "debut", label: "Début", type: "time", required: true }, { key: "fin", label: "Fin", type: "time", required: true },
+        { key: "salle", label: "Salle", required: true }],
+      defaults: () => ({ debut: "09:00", fin: "11:00", type: "Examen final" })
+    }) },
+    { id: "soutenances", label: "Soutenances", render: (el) => renderCrud(el, {
+      col: "soutenances", title: "Soutenances des projets", sort: (a, b) => (a.date + a.heure).localeCompare(b.date + b.heure),
+      columns: [["Date", (r) => fmtDate(r.date)], ["Heure", (r) => esc(r.heure)], ["Étudiant(e)", (r) => esc(r.etudiant)], ["Sujet", (r) => esc(r.sujet)], ["Encadrant", (r) => esc(r.encadrant)], ["Jury", (r) => esc(r.jury)], ["Salle", (r) => esc(r.salle)]],
+      fields: [{ key: "date", label: "Date", type: "date", required: true }, { key: "heure", label: "Heure", type: "time", required: true },
+        { key: "etudiant", label: "Étudiant(e)", required: true }, { key: "encadrant", label: "Encadrant" },
+        { key: "sujet", label: "Sujet", required: true, full: true }, { key: "jury", label: "Jury", full: true }, { key: "salle", label: "Salle" }]
+    }) },
+    { id: "parametres", label: "Paramètres", render: (el) => {
+      el.innerHTML = `<div class="page-head"><h1>Paramètres</h1></div><div class="grid grid-3">
+        <div class="card"><h3>Mot de passe administrateur</h3><form id="apw"><label>Nouveau mot de passe</label><input type="password" name="p1" minlength="8" required><label style="margin-top:10px">Confirmation</label><input type="password" name="p2" minlength="8" required><button class="btn" style="margin-top:12px">Modifier</button></form></div>
+        <div class="card"><h3>Sauvegarde</h3><p class="muted">Exportez toutes les données (JSON) pour les archiver ou les transférer vers un autre navigateur.</p>
+          <button class="btn" id="exp">Exporter les données</button><br><br><label>Restaurer depuis un fichier</label><input type="file" id="imp" accept=".json"></div>
+        <div class="card"><h3>Page de connexion</h3><label class="checks" style="margin-bottom:14px"><input type="checkbox" id="demoh" ${Store.settings().demoHidden ? "checked" : ""}> Masquer les comptes de démonstration</label>
+          <h3>Réinitialisation</h3><p class="muted">Remet le jeu de démonstration et efface toutes les données.</p><button class="btn danger" id="rst">Réinitialiser</button></div></div>`;
+      el.querySelector("#apw").onsubmit = async (e) => { e.preventDefault(); const f = e.target; if (f.p1.value !== f.p2.value) return UI.toast("Les deux mots de passe diffèrent.");
+        Store.settings().adminHash = await hashPwd(f.p1.value); Store.saveSettings(); f.reset(); UI.toast("Mot de passe administrateur modifié."); };
+      el.querySelector("#exp").onclick = () => downloadFile(`master-s2i-sauvegarde-${todayISO()}.json`, Store.exportJSON());
+      el.querySelector("#imp").onchange = async (e) => { const file = e.target.files[0]; if (!file) return;
+        try { const obj = JSON.parse(await file.text()); if (!obj.settings || !obj.students) throw new Error("format"); if (!UI.confirm("Remplacer toutes les données actuelles ?")) return; await Store.importJSON(obj); UI.toast("Données restaurées."); location.reload(); }
+        catch { UI.toast("Fichier invalide."); } };
+      el.querySelector("#demoh").onchange = (e) => { Store.settings().demoHidden = e.target.checked; Store.saveSettings(); UI.toast("Enregistré."); };
+      el.querySelector("#rst").onclick = async () => { if (UI.confirm("Effacer toutes les données et revenir à la démonstration ?")) { await Store.reset(); Auth.logout(); } };
+    }}
+  ];
+  mountApp(user, "Administrateur · accès complet", views);
+})();
+</script>
+</body>
+</html>

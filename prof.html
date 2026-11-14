@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<title>Espace Professeur — Master S2I</title>
+</head>
+<body>
+<div id="header"></div>
+<div class="app" id="app"></div>
+<script src="assets/js/firebase-config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/components.js"></script>
+<script>
+(async () => {
+  await Store.init();
+  const user = Auth.require("prof"); if (!user) return;
+  renderHeader("prof.html", user);
+  const mods = (user.modules || []).filter((c) => Store.get("modules", c));
+  const sectionsMine = [...new Set(mods.flatMap((c) => sectionsOfYear(yearOfModule(c))))];
+  const channels = mods.flatMap((c) => sectionsOfYear(yearOfModule(c)).map((s) => ({ module: c, section: s })));
+  channels.unshift({ module: "ALL", section: "ALL" });
+  const ctxUser = { ...user, role: "prof" };
+
+  const views = [
+    { id: "accueil", label: "Tableau de bord", render: (el) => {
+      const sess = Store.all("sessions").filter((s) => s.profId === user.id);
+      const cont = Store.all("contents").filter((c) => c.profId === user.id);
+      const today = Store.all("timetable").filter((t) => t.profId === user.id && +t.jour === ((new Date().getDay() + 6) % 7) + 1 && slotInWeek(t, mondayOf())).sort((a, b) => a.debut.localeCompare(b.debut));
+      el.innerHTML = `<div class="page-head"><h1>Bonjour, Pr. ${esc(user.prenom)} ${esc(user.nom)}</h1></div>
+        <div class="grid grid-4" style="margin-bottom:24px">
+          <div class="stat"><b>${mods.length}</b><span>Module(s) enseigné(s)</span></div>
+          <div class="stat"><b>${sess.length}</b><span>Séance(s) d'appel</span></div>
+          <div class="stat"><b>${cont.filter((c) => c.statut === "publie").length}</b><span>Contenu(s) publié(s)</span></div>
+          <div class="stat"><b>${cont.filter((c) => c.statut !== "publie").length}</b><span>Contenu(s) non publié(s)</span></div></div>
+        <div class="grid grid-3">
+          <div class="card"><h3>Mes modules</h3><ul class="list-plain">${mods.map((c) => `<li>${esc(UI.moduleLabel(c))}</li>`).join("") || "<li class='muted'>Aucun module affecté.</li>"}</ul></div>
+          <div class="card"><h3>Mes cours aujourd'hui</h3><ul class="list-plain">${today.map((t) => `<li><b>${t.debut}–${t.fin}</b> · ${esc(t.module)} · ${t.section}<div class="muted">${t.mode === "distance" ? "" : esc(t.salle)} ${modePill(t.mode, t.lien)}</div></li>`).join("") || "<li class='muted'>Aucun cours aujourd'hui.</li>"}</ul>
+            <a class="btn sm" href="#absences" style="margin-top:12px">Saisir une absence</a></div>
+          <div class="card"><h3>Messages non lus</h3><p><b style="font-size:28px;color:var(--navy)">${Chat.totalUnread(ctxUser, channels)}</b></p><a class="btn outline sm" href="#messagerie">Ouvrir la messagerie</a></div></div>`;
+    }},
+    { id: "absences", label: "Absences", render: (el) => AttendanceView(el, { modules: mods, profId: user.id }) },
+    { id: "contenus", label: "Contenus pédagogiques", render: (el) => ContentsView(el, { modules: mods, profId: user.id, user }) },
+    { id: "messagerie", label: "Messagerie", badge: () => Chat.totalUnread(ctxUser, channels), render: (el) => ChatView(el, { user: ctxUser, role: "prof", channels, onRead: () => refreshBadges(views) }) },
+    { id: "edt", label: "Emploi du temps", render: (el) => TimetableView(el, { sections: sectionsMine, profId: user.id, title: "Mon emploi du temps" }) },
+    { id: "examens", label: "Examens & soutenances", render: (el) => ExamsView(el, { sections: sectionsMine }) },
+    { id: "profil", label: "Mon profil", render: (el) => ProfileView(el, user, "profs") }
+  ];
+  mountApp(user, "Espace Professeur", views);
+})();
+</script>
+</body>
+</html>

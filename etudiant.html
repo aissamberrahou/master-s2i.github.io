@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@600;700&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<title>Espace Étudiant — Master S2I</title>
+</head>
+<body>
+<div id="header"></div>
+<div class="app" id="app"></div>
+<script src="assets/js/firebase-config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/components.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script>
+(async () => {
+  await Store.init();
+  const user = Auth.require("student"); if (!user) return;
+  renderHeader("etudiant.html", user);
+  const sec = sectionOf(user);
+  const myMods = Store.all("modules").filter((m) => (m.sem <= 2 ? 1 : 2) === user.annee).map((m) => m.code);
+  const channels = [{ module: "ALL", section: "ALL" }, ...myMods.map((c) => ({ module: c, section: sec }))];
+  const ctxUser = { ...user, role: "student" };
+  const published = () => Store.all("contents").filter((c) => c.statut === "publie" && (c.sections || []).includes(sec) && myMods.includes(c.module));
+  const mySessions = () => Store.all("sessions").filter((s) => s.section === sec && s.records && s.records[user.id]);
+  const label = { P: "Présent", A: "Absent", R: "Retard", J: "Justifiée" };
+
+  const views = [
+    { id: "accueil", label: "Accueil", render: (el) => {
+      const seen = Chat.seen(ctxUser);
+      const notifs = channels.flatMap((c) => Chat.msgsOf(c).map((m) => ({ ...m, unread: m.date > (seen[Chat.key(c)] || "") && m.authorId !== user.id })))
+        .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+      const abs = mySessions().filter((s) => s.records[user.id] === "A").length;
+      const nextExam = Store.all("exams").filter((e) => e.section === sec && e.date >= todayISO()).sort((a, b) => a.date.localeCompare(b.date))[0];
+      el.innerHTML = `<div class="page-head"><h1>Bonjour ${esc(user.prenom)}</h1><span class="pill sec">${sec} · ${esc(S2I.formations[user.formation])}</span></div>
+        <div class="grid grid-4" style="margin-bottom:24px">
+          <div class="stat"><b>${published().length}</b><span>Contenu(s) disponible(s)</span></div>
+          <div class="stat" style="border-left-color:var(--garnet)"><b>${abs}</b><span>Absence(s) non justifiée(s)</span></div>
+          <div class="stat"><b>${Notif.unread(user) + Chat.totalUnread(ctxUser, channels)}</b><span>Notification(s) / message(s) non lu(s)</span></div>
+          <div class="stat"><b style="font-size:18px">${nextExam ? fmtDate(nextExam.date) : "—"}</b><span>${nextExam ? "Prochain examen : " + esc(nextExam.module) : "Aucun examen programmé"}</span></div></div>
+        <div class="panel"><div class="panel-h">📌 Annonces de la coordination</div><div class="panel-b">
+          ${(() => { const r = Notif.readSet(user); const l = Notif.forStudent(user).slice(0, 3); return l.length ? l.map((n) => notifCard(n, !r.has(n.id))).join("") : "<p class='muted'>Aucune annonce.</p>"; })()}
+          <a class="btn outline sm" href="#notifications">Toutes les notifications</a></div></div>
+        <div class="panel"><div class="panel-h">💬 Derniers messages</div><div class="panel-b"><ul class="list-plain">
+          ${notifs.map((m) => `<li>${m.unread ? '<span class="badge">nouveau</span> ' : ""}<b>${esc(m.module === "ALL" ? "Annonce" : m.module)}</b> — ${esc(m.text)}<div class="muted">${esc(m.authorName)} · ${fmtDateTime(m.date)}</div></li>`).join("") || "<li class='muted'>Aucune notification.</li>"}
+        </ul><a class="btn outline sm" href="#messagerie" style="margin-top:10px">Ouvrir la messagerie</a></div></div>`;
+    }},
+    { id: "notifications", label: "Notifications", badge: () => Notif.unread(user), render: (el) => StudentNotificationsView(el, user, () => refreshBadges(views)) },
+    { id: "contenus", label: "Contenus pédagogiques", render: (el) => {
+      const st = { type: "" };
+      const draw = () => {
+        const list = published().filter((c) => !st.type || c.type === st.type);
+        const byMod = myMods.filter((m) => list.some((c) => c.module === m));
+        el.innerHTML = `<div class="page-head"><h1>Contenus pédagogiques</h1><div class="toolbar"><select id="ft"><option value="">Tous types</option>${Object.entries(S2I.typesContenu).map(([k, v]) => `<option value="${k}" ${st.type === k ? "selected" : ""}>${v}</option>`).join("")}</select></div></div>
+          ${byMod.length ? byMod.map((m) => `<div class="panel"><div class="panel-h">${esc(UI.moduleLabel(m))}</div><div class="panel-b"><ul class="list-plain">
+            ${list.filter((c) => c.module === m).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((c) => `<li><span class="pill t-${c.type}">${S2I.typesContenu[c.type]}</span> <b>${esc(c.titre)}</b>
+              ${c.dateLimite ? ` <span class="pill off">À rendre avant le ${fmtDate(c.dateLimite)}</span>` : ""}
+              ${c.description ? `<div style="white-space:pre-wrap;margin-top:4px">${esc(c.description)}</div>` : ""}
+              <div style="margin-top:6px">${c.lien ? `<a class="btn outline sm" href="${esc(c.lien)}" target="_blank" rel="noopener">Ouvrir le lien</a> ` : ""}${c.fichier ? `<a class="btn outline sm" href="${c.fichier.data}" download="${esc(c.fichier.name)}">Télécharger ${esc(c.fichier.name)}</a>` : ""}</div>
+              <div class="muted">${esc(UI.profName(c.profId))} · publié le ${fmtDate((c.updatedAt || c.createdAt).slice(0, 10))}</div></li>`).join("")}</ul></div></div>`).join("")
+          : `<div class="alert info">Aucun contenu publié pour le moment.</div>`}`;
+        document.getElementById("ft").onchange = (e) => { st.type = e.target.value; draw(); };
+      };
+      draw();
+    }},
+    { id: "absences", label: "Mes absences", render: (el) => {
+      const ss = mySessions().sort((a, b) => (b.date + b.debut).localeCompare(a.date + a.debut));
+      const rows = myMods.map((m) => { const x = ss.filter((s) => s.module === m); const c = { A: 0, R: 0, J: 0 }; x.forEach((s) => { const v = s.records[user.id]; if (c[v] !== undefined) c[v]++; }); return { m, n: x.length, ...c }; }).filter((r) => r.n);
+      el.innerHTML = `<div class="page-head"><h1>Suivi de mes absences</h1></div>
+        <div class="panel"><div class="panel-h">Récapitulatif par module</div>${rows.length ? `<div class="table-scroll"><table class="data"><thead><tr><th>Module</th><th>Séances</th><th>Absences</th><th>Retards</th><th>Justifiées</th><th>Taux d'absence</th></tr></thead><tbody>
+          ${rows.map((r) => { const rate = Math.round((r.A / r.n) * 100); return `<tr><td>${esc(UI.moduleLabel(r.m))}</td><td>${r.n}</td><td>${r.A}</td><td>${r.R}</td><td>${r.J}</td><td class="rate ${rate >= 25 ? "bad" : ""}">${rate} %</td></tr>`; }).join("")}</tbody></table></div>` : `<div class="empty">Aucune séance enregistrée.</div>`}</div>
+        <div class="panel"><div class="panel-h">Détail des séances</div>${ss.length ? `<div class="table-scroll"><table class="data"><thead><tr><th>Date</th><th>Horaire</th><th>Module</th><th>Nature</th><th>Mode</th><th>Statut</th><th>Remarque</th></tr></thead><tbody>
+          ${ss.map((s) => { const v = s.records[user.id]; return `<tr><td>${fmtDate(s.date)}</td><td>${s.debut}–${s.fin}</td><td>${esc(s.module)}</td><td>${esc(s.nature)}</td><td>${modePill(s.mode)}</td><td><span class="pill ${v === "P" ? "pub" : v === "A" ? "off" : "draft"}">${label[v]}</span></td><td>${esc((s.comments || {})[user.id] || "")}</td></tr>`; }).join("")}</tbody></table></div>` : `<div class="empty">—</div>`}</div>`;
+    }},
+    { id: "edt", label: "Emploi du temps", render: (el) => TimetableView(el, { sections: [sec], title: "Emploi du temps — " + sec }) },
+    { id: "messagerie", label: "Messagerie", badge: () => Chat.totalUnread(ctxUser, channels), render: (el) => ChatView(el, { user: ctxUser, role: "student", channels, onRead: () => refreshBadges(views) }) },
+    { id: "examens", label: "Examens & soutenances", render: (el) => ExamsView(el, { sections: [sec] }) },
+    { id: "profil", label: "Mon profil", render: (el) => ProfileView(el, user, "students") }
+  ];
+  mountApp(user, "Espace Étudiant · " + sec, views);
+})();
+</script>
+</body>
+</html>
