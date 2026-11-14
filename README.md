@@ -46,6 +46,13 @@ Le site est statique (HTML, CSS, JavaScript) et hébergé gratuitement par GitHu
 - Le module est reconnu par son code ou son intitulé, l'enseignant par son identifiant ou son nom. Un aperçu signale les lignes en erreur.
 - Mode « remplacer » (les créneaux existants des sections importées sont remplacés) ou « ajouter ». Modèles Excel et export disponibles.
 
+### E-mails de création de compte (étudiants et enseignants)
+- Après un **import Excel d'étudiants**, la création d'un **compte enseignant** ou d'un étudiant, ou un clic sur **Identifiants** (dans la liste ou pour toute une promotion), une fenêtre propose d'envoyer à chacun son identifiant, son mot de passe provisoire et une présentation des services de son espace.
+- **Envoi automatique** avec [EmailJS](https://www.emailjs.com) (gratuit jusqu'à 200 e-mails par mois) : à configurer dans Administration > Paramètres > Envoi des e-mails. Le modèle EmailJS utilise les champs `{{to_email}}`, `{{subject}}`, `{{message}}`, `{{from_name}}` et `{{reply_to}}`.
+- **Sans configuration** : chaque e-mail s'ouvre prérempli dans votre messagerie (Outlook, Gmail…), ou bien un fichier Excel de publipostage est téléchargé.
+- Les modèles des e-mails (étudiant et enseignant) sont modifiables dans les Paramètres.
+- À la première connexion, l'utilisateur doit choisir un nouveau mot de passe. La colonne « Identifiants » indique si et quand les accès ont été envoyés.
+
 ### Contenus pédagogiques
 Cours, TD, TP et devoirs : ajouter, modifier, supprimer, **publier** (visible par les étudiants des sections choisies), **dépublier** ou **désactiver**.
 À la publication, un message est envoyé automatiquement dans la messagerie du module et de la section concernés.
@@ -99,6 +106,8 @@ assets/js/components.js      Absences, contenus, messagerie, emploi du temps, ex
 assets/js/excel.js           Import / export Excel (étudiants, emploi du temps)
 assets/js/admin-students.js  Gestion des étudiants par formation et promotion
 assets/js/vendor/            SheetJS 0.18.5 (lecture/écriture Excel, licence Apache 2.0)
+assets/js/mailer.js          E-mails de création de compte (EmailJS / messagerie / publipostage)
+assets/js/vendor/emailjs.min.js  SDK EmailJS 5.0.3
 assets/js/firebase-config.js Configuration Firebase (optionnelle)
 ```
 

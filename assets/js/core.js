@@ -255,7 +255,9 @@ function mountApp(user, roleLabel, views) {
     <section class="main" id="main"></section>`;
   const show = () => {
     const id = location.hash.slice(1) || views[0].id;
-    const v = views.find((x) => x.id === id) || views[0];
+    let v = views.find((x) => x.id === id) || views[0];
+    const fresh = Auth.user();
+    if (fresh && fresh.mustChange && views.some((x) => x.id === "profil")) v = views.find((x) => x.id === "profil");
     $$(".sidebar a").forEach((a) => a.classList.toggle("active", a.dataset.v === v.id));
     const main = $("#main"); main.innerHTML = "";
     v.render(main);
@@ -350,6 +352,7 @@ function renderCrud(el, cfg) {
         const obj = { ...row, ...vals };
         if (cfg.beforeSave) { const r = await cfg.beforeSave(obj, isNew); if (r === false) return false; }
         Store.put(cfg.col, obj); UI.toast("Enregistré."); draw();
+        if (cfg.afterSave) cfg.afterSave(obj, isNew);
       }
     });
   };

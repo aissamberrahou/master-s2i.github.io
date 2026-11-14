@@ -121,7 +121,7 @@ function importStudentsDialog(onDone, defaults = {}) {
         <div><label>Formation (si absente du fichier)</label><select name="formation">${Object.entries(S2I.formations).map(([k, v]) => `<option value="${k}" ${defaults.formation === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div><label>Promotion (si absente)</label><input name="promotion" list="dl-promos" value="${esc(defaults.promotion || "")}" placeholder="ex. 2026-2028"><datalist id="dl-promos">${promos.map((p) => `<option value="${esc(p)}">`).join("")}</datalist></div>
         <div><label>Année (si absente)</label><select name="annee"><option value="1" ${defaults.annee == 2 ? "" : "selected"}>1re année</option><option value="2" ${defaults.annee == 2 ? "selected" : ""}>2e année</option></select></div>
-        <div><label>Mots de passe</label><select name="pwmode"><option value="random">Générer automatiquement (liste téléchargée)</option><option value="file">Colonne « Mot de passe » du fichier</option></select></div>
+        <div><label>Mots de passe</label><select name="pwmode"><option value="random">Générer automatiquement (envoyés par e-mail)</option><option value="file">Colonne « Mot de passe » du fichier</option></select></div>
         <div class="full checks"><label><input type="checkbox" name="update" checked> Mettre à jour les étudiants déjà inscrits (même code)</label></div>
       </div><div id="preview" style="margin-top:16px"></div>`,
     onSubmit: async (f) => {
@@ -168,7 +168,7 @@ function importStudentsDialog(onDone, defaults = {}) {
   }
 
   async function commit(f) {
-    const creds = []; const byLogin = Object.fromEntries(Store.all("students").map((s) => [s.login.toLowerCase(), s]));
+    const items = []; const byLogin = Object.fromEntries(Store.all("students").map((s) => [s.login.toLowerCase(), s]));
     for (const o of parsed.filter((x) => x.status === "nouveau" || x.status === "maj")) {
       const cur = byLogin[o.login.toLowerCase()];
       const s = cur ? { ...cur } : { inactif: false };
@@ -176,15 +176,14 @@ function importStudentsDialog(onDone, defaults = {}) {
       if (o.email) s.email = o.email; else if (!cur) s.email = "";
       let pw = f.pwmode.value === "file" ? o.password : "";
       if (!pw && !cur) pw = randomPassword();
-      if (pw) { s.passHash = await hashPwd(pw); creds.push([o.login, o.nom, o.prenom, `${o.formation}-${o.annee}A`, o.promotion, pw]); }
-      Store.put("students", s);
+      if (pw) { s.passHash = await hashPwd(pw); s.mustChange = true; }
+      const saved = Store.put("students", s);
+      if (pw) items.push({ kind: "student", account: saved, password: pw });
     }
     const nb = parsed.filter((x) => x.status === "nouveau" || x.status === "maj").length;
-    if (creds.length && f.pwmode.value === "random") {
-      await Excel.download(`identifiants_etudiants_${todayISO()}.xlsx`, [{ name: "Identifiants", widths: [16, 18, 18, 10, 12, 14],
-        rows: [["Code (identifiant)", "Nom", "Prénom", "Section", "Promotion", "Mot de passe"], ...creds] }]);
-      UI.toast(`${nb} étudiant(s) importé(s). Liste des identifiants téléchargée.`);
-    } else UI.toast(`${nb} étudiant(s) importé(s).`);
+    UI.toast(`${nb} étudiant(s) importé(s).`);
+    if (items.length && typeof sendCredentialsDialog === "function")
+      sendCredentialsDialog(items, { title: `${items.length} compte(s) étudiant créé(s) — envoyer les identifiants`, onClose: onDone });
   }
 }
 

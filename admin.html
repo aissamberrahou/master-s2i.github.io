@@ -20,6 +20,7 @@
 <script src="assets/js/excel.js"></script>
 <script src="assets/js/admin-students.js"></script>
 <script src="assets/js/notifications.js"></script>
+<script src="assets/js/mailer.js"></script>
 <script>
 (async () => {
   await Store.init();
@@ -36,14 +37,26 @@
     const dup = Store.all(col).find((x) => x.id !== obj.id && (x.login || "").toLowerCase() === obj.login.toLowerCase());
     if (dup) { UI.toast("Cet identifiant existe déjà."); return false; } return true;
   };
+  let pendingPw = null;
   const withPassword = (col) => async (obj, isNew) => {
     if (!uniqueLogin(col)(obj)) return false;
-    if (obj.password) obj.passHash = await hashPwd(obj.password);
-    else if (isNew) { UI.toast("Indiquez un mot de passe initial."); return false; }
+    pendingPw = obj.password || (isNew ? randomPassword() : null);
+    if (pendingPw) { obj.passHash = await hashPwd(pendingPw); obj.mustChange = true; }
     delete obj.password;
     if (col === "students") obj.annee = Number(obj.annee);
     obj.inactif = obj.inactif === "1";
   };
+  const credsAfterSave = (kind) => (obj, isNew) => {
+    if (!pendingPw) return; const pw = pendingPw; pendingPw = null;
+    sendCredentialsDialog([{ kind, account: obj, password: pw }], { title: isNew ? `Compte ${kind === "prof" ? "enseignant" : "étudiant"} créé — envoyer les identifiants` : "Mot de passe modifié — envoyer les nouveaux identifiants" });
+  };
+  const credsColumn = ["Identifiants", (r) => r.credsSentAt ? `<span class="muted">Envoyés le ${fmtDate(r.credsSentAt)}</span>` : '<span class="pill draft">Non envoyés</span>'];
+  const credsRowAction = (r) => `<button class="btn outline sm" data-creds="${r.id}" title="Générer un nouveau mot de passe provisoire et l'envoyer par e-mail">Identifiants</button> `;
+  const bindCredsButtons = (box, kind, redraw) => $$("[data-creds]", box).forEach((b) => b.onclick = async () => {
+    const col = kind === "prof" ? "profs" : "students"; const a = Store.get(col, b.dataset.creds);
+    if (!UI.confirm(`Générer un nouveau mot de passe provisoire pour ${a.prenom} ${a.nom} et l'envoyer par e-mail ?\nL'ancien mot de passe ne fonctionnera plus.`)) return;
+    sendCredentialsDialog([await resetCredentials(kind, a)], { onClose: redraw }); redraw();
+  });
   const actifField = { key: "inactif", label: "Compte", type: "select", options: () => [["0", "Actif"], ["1", "Désactivé"]] };
 
   const views = [
@@ -58,16 +71,19 @@
           <div class="stat"><b>${Store.all("exams").length + Store.all("soutenances").length}</b><span>Examens & soutenances</span></div></div>
         ${Store.mode === "local" ? `<div class="alert warn">Mode démonstration : les données sont enregistrées dans ce navigateur uniquement. Pour partager les données entre enseignants et étudiants, configurez Firebase (voir README du dépôt). Pensez aussi à changer les mots de passe de démonstration (onglet Paramètres).</div>` : ""}`;
     }},
-    { id: "etudiants", label: "Étudiants", render: (el) => StudentsAdmin(el, { actifField, withPassword }) },
+    { id: "etudiants", label: "Étudiants", render: (el) => StudentsAdmin(el, { actifField, withPassword, afterSave: credsAfterSave("student"), credsColumn, credsRowAction, bindCredsButtons }) },
     { id: "enseignants", label: "Enseignants", render: (el) => renderCrud(el, {
       col: "profs", title: "Enseignants", sort: (a, b) => a.nom.localeCompare(b.nom),
-      columns: [["Identifiant", (r) => esc(r.login)], ["Nom", (r) => `Pr. ${esc(r.prenom)} ${esc(r.nom)}`], ["Modules", (r) => (r.modules || []).map((m) => `<span class="pill sec">${m}</span>`).join(" ")], ["Compte", (r) => r.inactif ? '<span class="pill off">Désactivé</span>' : '<span class="pill pub">Actif</span>']],
+      columns: [["Identifiant", (r) => esc(r.login)], ["Nom", (r) => `Pr. ${esc(r.prenom)} ${esc(r.nom)}`], ["E-mail", (r) => esc(r.email || "—")], ["Modules", (r) => (r.modules || []).map((m) => `<span class="pill sec">${m}</span>`).join(" ")], credsColumn, ["Compte", (r) => r.inactif ? '<span class="pill off">Désactivé</span>' : '<span class="pill pub">Actif</span>']],
+      rowActions: credsRowAction,
       fields: [
-        { key: "login", label: "Identifiant", required: true }, { key: "email", label: "E-mail", type: "email" },
+        { key: "login", label: "Identifiant", required: true }, { key: "email", label: "E-mail (pour l'envoi des identifiants)", type: "email" },
         { key: "nom", label: "Nom", required: true }, { key: "prenom", label: "Prénom", required: true },
-        { key: "password", label: "Mot de passe", type: "password", placeholder: "Laisser vide pour ne pas changer" }, actifField,
+        { key: "password", label: "Mot de passe", type: "password", placeholder: "Vide : généré (nouveau compte) / inchangé" }, actifField,
         { key: "modules", label: "Modules enseignés", type: "multi", full: true, options: modOpts }],
-      beforeSave: withPassword("profs")
+      beforeSave: withPassword("profs"),
+      afterSave: credsAfterSave("prof"),
+      afterDraw: (box, redraw) => bindCredsButtons(box, "prof", redraw)
     }) },
     { id: "modules", label: "Modules", render: (el) => renderCrud(el, {
       col: "modules", title: "Modules de la formation",
@@ -155,7 +171,9 @@
         <div class="card"><h3>Sauvegarde</h3><p class="muted">Exportez toutes les données (JSON) pour les archiver ou les transférer vers un autre navigateur.</p>
           <button class="btn" id="exp">Exporter les données</button><br><br><label>Restaurer depuis un fichier</label><input type="file" id="imp" accept=".json"></div>
         <div class="card"><h3>Page de connexion</h3><label class="checks" style="margin-bottom:14px"><input type="checkbox" id="demoh" ${Store.settings().demoHidden ? "checked" : ""}> Masquer les comptes de démonstration</label>
-          <h3>Réinitialisation</h3><p class="muted">Remet le jeu de démonstration et efface toutes les données.</p><button class="btn danger" id="rst">Réinitialiser</button></div></div>`;
+          <h3>Réinitialisation</h3><p class="muted">Remet le jeu de démonstration et efface toutes les données.</p><button class="btn danger" id="rst">Réinitialiser</button></div>
+        ${MailSettingsCards()}</div>`;
+      bindMailSettings(el);
       el.querySelector("#apw").onsubmit = async (e) => { e.preventDefault(); const f = e.target; if (f.p1.value !== f.p2.value) return UI.toast("Les deux mots de passe diffèrent.");
         Store.settings().adminHash = await hashPwd(f.p1.value); Store.saveSettings(); f.reset(); UI.toast("Mot de passe administrateur modifié."); };
       el.querySelector("#exp").onclick = () => downloadFile(`master-s2i-sauvegarde-${todayISO()}.json`, Store.exportJSON());

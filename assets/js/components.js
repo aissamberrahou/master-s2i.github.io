@@ -289,7 +289,9 @@ function ExamsView(el, { sections }) {
 
 /* ---------- Profil : changement de mot de passe ---------- */
 function ProfileView(el, user, col) {
+  const must = (Store.get(col, user.id) || {}).mustChange;
   el.innerHTML = `<div class="page-head"><h1>Mon profil</h1></div>
+    ${must ? `<div class="alert warn" style="max-width:520px;margin-bottom:14px">Bienvenue ! Pour sécuriser votre compte, choisissez un nouveau mot de passe avant d'utiliser la plateforme. Le mot de passe actuel est celui reçu par e-mail.</div>` : ""}
     <div class="card" style="max-width:520px"><p><b>${esc(user.prenom)} ${esc(user.nom)}</b><br><span class="muted">Identifiant : ${esc(user.login)}</span></p>
     <form id="pw" class="form-grid"><div class="full"><label>Mot de passe actuel</label><input type="password" name="old" required></div>
     <div><label>Nouveau mot de passe</label><input type="password" name="n1" minlength="8" required></div>
@@ -299,6 +301,8 @@ function ProfileView(el, user, col) {
     e.preventDefault(); const f = e.target; const u = Store.get(col, user.id);
     if ((await hashPwd(f.old.value)) !== u.passHash) return UI.toast("Mot de passe actuel incorrect.");
     if (f.n1.value !== f.n2.value) return UI.toast("Les deux mots de passe diffèrent.");
-    u.passHash = await hashPwd(f.n1.value); Store.put(col, u); f.reset(); UI.toast("Mot de passe modifié.");
+    if (f.n1.value === f.old.value) return UI.toast("Choisissez un mot de passe différent de l'actuel.");
+    u.passHash = await hashPwd(f.n1.value); const wasMust = u.mustChange; u.mustChange = false; Store.put(col, u); f.reset(); UI.toast("Mot de passe modifié.");
+    if (wasMust) setTimeout(() => { location.hash = ""; location.reload(); }, 700);
   };
 }

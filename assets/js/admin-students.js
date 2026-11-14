@@ -3,7 +3,7 @@
    ========================================================================== */
 const StudentsFilter = { formation: "", promotion: "", annee: "", statut: "actifs", q: "" };
 
-function StudentsAdmin(el, { actifField, withPassword }) {
+function StudentsAdmin(el, { actifField, withPassword, afterSave, credsColumn, credsRowAction, bindCredsButtons }) {
   const F = StudentsFilter;
   const promos = () => [...new Set(Store.all("students").map((s) => s.promotion || ""))].sort().reverse();
   const match = (s) => (!F.formation || s.formation === F.formation) && (!F.promotion || (s.promotion || "") === (F.promotion === "—" ? "" : F.promotion))
@@ -44,6 +44,7 @@ function StudentsAdmin(el, { actifField, withPassword }) {
           ${ann.length === 1 && ann[0] === 1 ? `<button class="btn outline sm" data-g="up" data-k="${k}">Passer en 2e année</button>` : ""}
           ${g.actifs ? `<button class="btn outline sm" data-g="off" data-k="${k}">Désactiver</button>` : `<button class="btn outline sm" data-g="on" data-k="${k}">Réactiver</button>`}
           <button class="btn outline sm" data-g="imp" data-k="${k}">Importer</button>
+          ${g.actifs ? `<button class="btn outline sm" data-g="mail" data-k="${k}" title="Nouveaux mots de passe provisoires envoyés par e-mail">Identifiants</button>` : ""}
           <button class="btn danger sm" data-g="del" data-k="${k}">Supprimer</button></td></tr>`; }).join("")}
       </tbody></table></div>` : `<div class="empty">Aucun étudiant. Importez une liste Excel pour commencer.</div>`;
     $$("[data-g]", el).forEach((b) => b.onclick = () => groupAction(b.dataset.g, ...b.dataset.k.split("|")));
@@ -54,6 +55,13 @@ function StudentsAdmin(el, { actifField, withPassword }) {
     const label = `${formation} — promotion ${promotion || "non renseignée"}`;
     if (action === "show") { Object.assign(F, { formation, promotion: promotion || "—", annee: "", statut: "tous", q: "" }); syncInputs(); drawList(); $("#st-list", el).scrollIntoView({ behavior: "smooth" }); return; }
     if (action === "imp") { importStudentsDialog(refresh, { formation, promotion, annee: members[0] ? members[0].annee : 1 }); return; }
+    if (action === "mail") {
+      const act = members.filter((s) => !s.inactif); const noSent = act.filter((s) => !s.credsSentAt);
+      const target = noSent.length && noSent.length < act.length && UI.confirm(`${noSent.length} étudiant(s) de ${label} n'ont jamais reçu leurs identifiants.\nOK = ne traiter que ceux-là · Annuler = tous les ${act.length} étudiants actifs`) ? noSent : act;
+      if (!UI.confirm(`Générer de nouveaux mots de passe provisoires pour ${target.length} étudiant(s) et les envoyer par e-mail ?\nLeurs anciens mots de passe ne fonctionneront plus.`)) return;
+      const items = []; for (const s of target) items.push(await resetCredentials("student", s));
+      sendCredentialsDialog(items, { title: `Identifiants — ${label}`, onClose: refresh }); refresh(); return;
+    }
     if (action === "up") { if (!UI.confirm(`Passer les ${members.filter((s) => !s.inactif).length} étudiant(s) actif(s) de ${label} en 2e année ?\nIls apparaîtront dans la section ${formation}-2A pour les absences et l'emploi du temps.`)) return;
       members.filter((s) => !s.inactif).forEach((s) => Store.put("students", { ...s, annee: 2 })); UI.toast("Promotion passée en 2e année."); }
     if (action === "off" || action === "on") { const off = action === "off"; if (!UI.confirm(`${off ? "Désactiver" : "Réactiver"} tous les comptes de ${label} ?${off ? "\n(Les étudiants ne pourront plus se connecter ; l'historique des absences est conservé.)" : ""}`)) return;
@@ -67,7 +75,7 @@ function StudentsAdmin(el, { actifField, withPassword }) {
     col: "students", title: `Liste des étudiants (${Store.all("students").filter(match).length})`, filter: match,
     sort: (a, b) => (b.promotion || "").localeCompare(a.promotion || "") || sectionOf(a).localeCompare(sectionOf(b)) || a.nom.localeCompare(b.nom),
     columns: [["Code", (r) => esc(r.login)], ["Nom", (r) => esc(r.nom.toUpperCase())], ["Prénom", (r) => esc(r.prenom)], ["Formation", (r) => r.formation], ["Promotion", (r) => esc(r.promotion || "—")],
-      ["Section", (r) => `<span class="pill sec">${sectionOf(r)}</span>`], ["E-mail", (r) => esc(r.email || "")], ["Compte", (r) => r.inactif ? '<span class="pill off">Désactivé</span>' : '<span class="pill pub">Actif</span>']],
+      ["Section", (r) => `<span class="pill sec">${sectionOf(r)}</span>`], ["E-mail", (r) => esc(r.email || "")], credsColumn, ["Compte", (r) => r.inactif ? '<span class="pill off">Désactivé</span>' : '<span class="pill pub">Actif</span>']],
     fields: [
       { key: "login", label: "Code étudiant (identifiant)", required: true },
       { key: "nom", label: "Nom", required: true }, { key: "prenom", label: "Prénom", required: true },
@@ -75,10 +83,10 @@ function StudentsAdmin(el, { actifField, withPassword }) {
       { key: "formation", label: "Formation", type: "select", options: () => Object.entries(S2I.formations) },
       { key: "promotion", label: "Promotion", placeholder: "ex. 2026-2028", datalist: () => promos().filter(Boolean) },
       { key: "annee", label: "Année", type: "select", options: () => [["1", "1re année"], ["2", "2e année"]] },
-      { key: "password", label: "Mot de passe", type: "password", placeholder: "Laisser vide pour ne pas changer" }, actifField],
+      { key: "password", label: "Mot de passe", type: "password", placeholder: "Vide : généré (nouveau compte) / inchangé" }, actifField],
     defaults: () => ({ formation: F.formation || "TN", promotion: F.promotion && F.promotion !== "—" ? F.promotion : "", annee: Number(F.annee) || 1 }),
-    beforeSave: withPassword("students"),
-    afterDraw: (box) => { drawGroups(); fillPromoSelect(); const h = $("h1", box); if (h) h.textContent = `Liste des étudiants (${Store.all("students").filter(match).length})`; }
+    beforeSave: withPassword("students"), afterSave, rowActions: credsRowAction,
+    afterDraw: (box, redraw) => { bindCredsButtons(box, "student", redraw); drawGroups(); fillPromoSelect(); const h = $("h1", box); if (h) h.textContent = `Liste des étudiants (${Store.all("students").filter(match).length})`; }
   });
 
   const refresh = () => drawList();
