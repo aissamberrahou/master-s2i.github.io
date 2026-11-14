@@ -47,7 +47,7 @@
     document.getElementById("ident-l").textContent = labels[r];
     document.getElementById("err").textContent = "";
     document.getElementById("demo").innerHTML = Store.settings().demoHidden ? "" :
-      "Comptes de démonstration — prof : <b>aberrahou</b> / prof2026 · étudiant : <b>S2I-TN1-01</b> / etud2026 · admin : admin2026. À changer depuis l'administration.";
+    
   };
   document.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => setRole(b.dataset.r)));
   setRole(role);
