@@ -257,7 +257,7 @@ function importTimetableDialog(onDone) {
         let debut = Excel.time(get("debut")), fin = Excel.time(get("fin"));
         if ((!debut || !fin) && map.horaire !== undefined) { const t = String(get("horaire")).split(/[-–à]/); debut = Excel.time(t[0]); fin = Excel.time(t[1]); }
         const o = { line: idx + i + 2, section: Match.section(get("section"), defSec), jour: Match.jour(get("jour")), debut, fin,
-          module: Match.module(get("module")), salle: String(get("salle") || "").trim(), profId: Match.prof(get("prof")), src: String(get("module")),
+          module: Match.module(get("module")), salle: String(get("salle") || "").trim(), profId: Match.prof(get("prof")), profNom: String(get("prof") || "").trim(), src: String(get("module")),
           mode: Match.mode(get("mode") || get("salle"), f.defmode.value), lien: Match.lien(get("lien")), semaine: get("semaine") !== "" && Excel.date(get("semaine")) ? mondayOf(Excel.date(get("semaine"))) : f.semaine.value };
         if (!String(get("jour")).trim() && !String(get("module")).trim()) return;
         check(o); parsed.push(o);
@@ -272,9 +272,9 @@ function importTimetableDialog(onDone) {
     $("#preview", m).innerHTML = `<div class="alert info">Format <b>${gIdx >= 0 ? "grille" : "liste"}</b> — ${parsed.length} créneau(x) lus, <b>${ok.length}</b> valide(s), ${parsed.length - ok.length} erreur(s). Section(s) : ${secs.join(", ") || "—"}. ${f.semaine.value ? weekLabel(f.semaine.value) : "Créneaux récurrents (toutes les semaines)"}.
         ${f.mode.value === "replace" && secs.length ? `Les créneaux existants de ${secs.join(", ")} pour la même semaine seront remplacés.` : ""}</div>
       <div class="table-scroll" style="max-height:320px;overflow-y:auto;margin-top:10px"><table class="data"><thead><tr><th>Ligne</th><th>Section</th><th>Jour</th><th>Horaire</th><th>Module</th><th>Mode</th><th>Salle</th><th>Enseignant</th><th>État</th></tr></thead><tbody>
-      ${parsed.map((o) => `<tr><td>${o.line}</td><td>${o.section}</td><td>${S2I.jours[o.jour - 1] || "?"}</td><td>${o.debut || "?"} – ${o.fin || "?"}</td><td>${esc(o.module || o.src)}</td><td>${modePill(o.mode, o.lien)}</td><td>${esc(o.salle)}</td><td>${o.profId ? esc(UI.profName(o.profId)) : "—"}</td>
+      ${parsed.map((o) => `<tr><td>${o.line}</td><td>${o.section}</td><td>${S2I.jours[o.jour - 1] || "?"}</td><td>${o.debut || "?"} – ${o.fin || "?"}</td><td>${esc(o.module || o.src)}</td><td>${modePill(o.mode, o.lien)}</td><td>${esc(o.salle)}</td><td>${o.profId ? esc(UI.profName(o.profId)) : o.profNom ? `${esc(o.profNom)} <span class="muted">(sans compte)</span>` : "—"}</td>
         <td>${o.error ? `<span class="pill off">${o.error}</span>` : '<span class="pill pub">OK</span>'}</td></tr>`).join("")}</tbody></table></div>
-      <p class="muted">Un enseignant non reconnu reste vide : vous pourrez l'ajouter ensuite. Les créneaux en erreur ne sont pas importés.</p>`;
+      <p class="muted">Un enseignant sans compte sur le site est conservé par son nom (il pourra être associé à un compte ensuite). Les créneaux en erreur ne sont pas importés.</p>`;
     const btn = $(".modal-f .btn:not(.outline)", m); btn.textContent = `Importer ${ok.length} créneau(x)`; btn.disabled = !ok.length; if (!ok.length) parsed = null;
   }
 
@@ -282,7 +282,7 @@ function importTimetableDialog(onDone) {
     const ok = parsed.filter((o) => !o.error); const secs = [...new Set(ok.map((o) => o.section))];
     const weeks = [...new Set(ok.map((o) => o.semaine || ""))];
     if (f.mode.value === "replace") Store.all("timetable").filter((t) => secs.includes(t.section) && weeks.includes(t.semaine || "")).forEach((t) => Store.del("timetable", t.id));
-    ok.forEach(({ section, jour, debut, fin, module, salle, profId, mode, lien, semaine }) => Store.put("timetable", { section, jour, debut, fin, module, salle: mode === "distance" ? salle : salle || "—", profId, mode, lien, semaine: semaine || "" }));
+    ok.forEach(({ section, jour, debut, fin, module, salle, profId, profNom, mode, lien, semaine }) => Store.put("timetable", { section, jour, debut, fin, module, salle: mode === "distance" ? salle : salle || "—", profId, profNom: profId ? "" : profNom || "", mode, lien, semaine: semaine || "" }));
     UI.toast(`${ok.length} créneau(x) importé(s).`);
   }
 }

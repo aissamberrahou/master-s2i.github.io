@@ -218,6 +218,7 @@ const UI = {
   confirm(msg) { return window.confirm(msg); },
   moduleLabel(code) { const m = Store.get("modules", code) || S2I.modules.find((x) => x.code === code); return m ? `${m.code} – ${m.titre}` : code === "ALL" ? "Annonces générales" : code; },
   moduleOptions(codes, sel) { return codes.map((c) => `<option value="${esc(c)}" ${c === sel ? "selected" : ""}>${esc(UI.moduleLabel(c))}</option>`).join(""); },
+  teacherOf(t) { return t.profId ? UI.profName(t.profId) : t.profNom || ""; },
   profName(id) { const p = Store.get("profs", id); return p ? `Pr. ${p.prenom} ${p.nom}` : "—"; },
   studentName(s) { return `${s.nom.toUpperCase()} ${s.prenom}`; }
 };

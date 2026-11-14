@@ -262,7 +262,7 @@ function TimetableView(el, { sections, profId, title = "Emploi du temps", onWeek
       <div class="table-scroll"><div class="tt">${S2I.jours.map((j, i) => { const date = shiftISO(mon, i);
         return `<div class="day ${date === todayISO() ? "today" : ""}"><h4>${j}<small>${fmtDate(date)}</small></h4>${rows.filter((r) => +r.jour === i + 1).sort((a, b) => a.debut.localeCompare(b.debut))
         .map((r) => `<div class="slot ${r.mode === "distance" ? "dist" : ""}"><span class="t">${r.debut} – ${r.fin}</span><b>${esc(r.module)}</b>${esc((Store.get("modules", r.module) || {}).titre || "")}
-          <div class="muted">${r.mode === "distance" ? "" : esc(r.salle)}${profId ? ` · ${r.section}` : r.profId ? ` · ${esc(UI.profName(r.profId))}` : ""}</div>
+          <div class="muted">${r.mode === "distance" ? "" : esc(r.salle)}${profId ? ` · ${r.section}` : UI.teacherOf(r) ? ` · ${esc(UI.teacherOf(r))}` : ""}</div>
           <div style="margin-top:4px">${modePill(r.mode, r.lien)}${r.semaine ? ' <span class="pill draft" title="Séance propre à cette semaine">ponctuelle</span>' : ""}</div></div>`).join("") || '<div class="muted" style="text-align:center">—</div>'}</div>`; }).join("")}</div></div>`
       : `<div class="alert info">Aucune séance programmée pour cette semaine.</div>`}`;
     const s = $("#tt-sec", el); if (s) s.onchange = (e) => { st.section = e.target.value; draw(); };

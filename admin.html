@@ -93,12 +93,13 @@
         extraButtons: `<button class="btn outline" data-ttall>${ttState.all ? "Semaine affichée seulement" : "Voir tous les créneaux"}</button><button class="btn outline" data-ttdup>Dupliquer la semaine</button><button class="btn outline" data-ttimp>Importer Excel</button><button class="btn outline" data-ttexp>Exporter Excel</button>`,
         sort: sortTT,
         columns: [["Section", (r) => `<span class="pill sec">${r.section}</span>`], ["Semaine", (r) => r.semaine ? `${fmtDate(r.semaine)}` : (r.exceptions || []).includes(TTWeek.monday) ? '<span class="pill off">Annulée cette semaine</span>' : '<span class="muted">Récurrent</span>'],
-          ["Jour", (r) => S2I.jours[r.jour - 1]], ["Horaire", (r) => `${r.debut} – ${r.fin}`], ["Module", (r) => esc(r.module)], ["Mode", (r) => modePill(r.mode, r.lien)], ["Salle", (r) => esc(r.salle || "—")], ["Enseignant", (r) => esc(UI.profName(r.profId))]],
+          ["Jour", (r) => S2I.jours[r.jour - 1]], ["Horaire", (r) => `${r.debut} – ${r.fin}`], ["Module", (r) => esc(r.module)], ["Mode", (r) => modePill(r.mode, r.lien)], ["Salle", (r) => esc(r.salle || "—")], ["Enseignant", (r) => esc(UI.teacherOf(r) || "—")]],
         rowActions: (r) => !r.semaine && !ttState.all ? `<button class="btn outline sm" data-ttskip="${r.id}">${(r.exceptions || []).includes(TTWeek.monday) ? "Rétablir cette semaine" : "Annuler cette semaine"}</button> ` : "",
         fields: [{ key: "section", label: "Section", type: "select", options: secOpts }, { key: "semaine", label: "Semaine", type: "select", options: () => weekOptions(TTWeek.monday) },
           { key: "jour", label: "Jour", type: "select", options: () => S2I.jours.map((j, i) => [String(i + 1), j]) },
           { key: "debut", label: "Début", type: "time", required: true }, { key: "fin", label: "Fin", type: "time", required: true },
-          { key: "module", label: "Module", type: "select", options: modOpts }, { key: "profId", label: "Enseignant", type: "select", empty: "—", options: profOpts },
+          { key: "module", label: "Module", type: "select", options: modOpts }, { key: "profId", label: "Enseignant (compte)", type: "select", empty: "—", options: profOpts },
+          { key: "profNom", label: "Enseignant sans compte (nom)", placeholder: "ex. Pr. K. Oulidi" },
           { key: "mode", label: "Mode d'enseignement", type: "select", options: () => Object.entries(MODES) },
           { key: "salle", label: "Salle (présentiel)" }, { key: "lien", label: "Lien de la séance (à distance)", type: "url", placeholder: "https://teams.microsoft.com/…", full: true }],
         defaults: () => ({ debut: "08:30", fin: "10:30", mode: "presentiel", semaine: "" }),
@@ -126,7 +127,7 @@
             const rows = Store.all("timetable").filter((t) => ttState.all || slotInWeek(t, TTWeek.monday)).sort(sortTT);
             Excel.download(`emploi_du_temps_S2I_${ttState.all ? "complet" : TTWeek.monday}.xlsx`, [{ name: "EDT", widths: [10, 12, 12, 8, 8, 10, 40, 12, 16, 22, 30],
               rows: [["Section", "Semaine", "Jour", "Début", "Fin", "Module", "Intitulé", "Mode", "Salle", "Enseignant", "Lien"], ...rows.map((t) => [t.section, t.semaine ? fmtDate(t.semaine) : "Récurrent", S2I.jours[t.jour - 1], t.debut, t.fin, t.module,
-                (Store.get("modules", t.module) || {}).titre || "", MODES[t.mode] || "Présentiel", t.salle || "", t.profId ? UI.profName(t.profId) : "", t.lien || ""])] }]);
+                (Store.get("modules", t.module) || {}).titre || "", MODES[t.mode] || "Présentiel", t.salle || "", UI.teacherOf(t), t.lien || ""])] }]);
           };
         }
       });
