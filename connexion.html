@@ -47,7 +47,7 @@
     document.getElementById("ident-l").textContent = labels[r];
     document.getElementById("err").textContent = "";
     document.getElementById("demo").innerHTML = Store.settings().demoHidden ? "" :
-    
+      "";
   };
   document.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => setRole(b.dataset.r)));
   setRole(role);
