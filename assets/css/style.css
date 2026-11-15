@@ -30,7 +30,7 @@ img { max-width: 100%; }
 .topbar { background: #fff; border-top: 4px solid var(--garnet); border-bottom: 1px solid var(--line); }
 .topbar .wrap { display: flex; align-items: center; gap: 18px; padding: 10px 24px; max-width: 1240px; margin: 0 auto; }
 .logos { display: flex; align-items: center; gap: 16px; }
-.logos img { height: 54px; width: auto; }
+.logos img { height: 60px; width: auto; }
 .logos .logo-s2i { height: 62px; }
 .logos .sep { width: 1px; height: 42px; background: var(--line); }
 .logo-txt { display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 12px; border: 2px solid var(--navy); color: var(--navy); font-weight: 700; letter-spacing: .06em; border-radius: 4px; font-size: 13px; }
@@ -261,6 +261,9 @@ table.form-row td, table.form-row th { border-right: 1px solid var(--line); }
   .chat { grid-template-columns: 1fr; }
   .chat .chans { max-height: 180px; border-right: 0; border-bottom: 1px solid var(--line); }
   .hero h1 { font-size: 32px; }
-  .logos img { height: 40px; }
+  .logos { gap: 8px; }
+  .logos img { height: 38px; }
+  .logos .logo-s2i { height: 40px; }
+  .logos .sep { height: 30px; }
   .topbar .right .who-name { display: none; }
 }
