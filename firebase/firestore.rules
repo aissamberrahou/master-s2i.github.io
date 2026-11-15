@@ -115,6 +115,14 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isProf() && resource.data.profId == me().refId);
     }
 
+    // Journal d'activité : chaque compte n'écrit que ses propres entrées (rôle vérifié) ;
+    // seul l'administrateur peut le consulter ou le purger. Aucune modification possible.
+    match /logs/{id} {
+      allow read, delete: if isAdmin();
+      allow create: if hasProfile() && request.resource.data.uid == request.auth.uid && request.resource.data.role == role();
+      allow update: if false;
+    }
+
     // Messagerie par module et section
     match /messages/{id} {
       allow read: if isStaff()
