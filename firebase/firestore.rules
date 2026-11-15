@@ -94,6 +94,18 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isProf() && resource.data.profId == me().refId);
     }
 
+    // Séances à distance (Microsoft Teams) : lisibles par tous les comptes connectés (le site filtre par section) ;
+    // le prof ne gère que ses séances, dans ses modules.
+    match /visios/{id} {
+      allow read: if signedIn();
+      allow create: if isAdmin()
+                  || (isProf() && request.resource.data.profId == me().refId && request.resource.data.module in profModules());
+      allow update: if isAdmin()
+                  || (isProf() && resource.data.profId == me().refId && request.resource.data.profId == me().refId
+                      && request.resource.data.module in profModules());
+      allow delete: if isAdmin() || (isProf() && resource.data.profId == me().refId);
+    }
+
     // Feuilles de présence : l'étudiant lit les séances de sa section ; le prof gère les siennes.
     match /sessions/{id} {
       allow read: if isStaff() || (isStudent() && resource.data.section == me().section);
