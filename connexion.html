@@ -71,6 +71,7 @@
     const u = await Auth.login(authRole, document.getElementById("ident").value, document.getElementById("pwd").value);
     if (!u) { document.getElementById("err").textContent = Auth.lastError || "Identifiant ou mot de passe incorrect."; return; }
     Auth.start(authRole, u);
+    await Journal.log("Connexion", "Espace " + { prof: "Professeur", etudiant: "Étudiant", admin: "Administrateur" }[role], { now: true });
     location.href = { prof: "prof.html", etudiant: "etudiant.html", admin: "admin.html" }[role];
   };
 })();

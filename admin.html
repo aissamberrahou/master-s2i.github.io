@@ -23,6 +23,7 @@
 <script src="assets/js/notifications.js"></script>
 <script src="assets/js/mailer.js"></script>
 <script src="assets/js/accounts.js"></script>
+<script src="assets/js/journal.js"></script>
 <script>
 (async () => {
   await Store.init();
@@ -183,6 +184,7 @@
         { key: "etudiant", label: "Étudiant(e)", required: true }, { key: "encadrant", label: "Encadrant" },
         { key: "sujet", label: "Sujet", required: true, full: true }, { key: "jury", label: "Jury", full: true }, { key: "salle", label: "Salle" }]
     }) },
+    { id: "journal", label: "Journal d'activité", render: (el) => JournalAdmin(el) },
     { id: "parametres", label: "Paramètres", render: (el) => {
       el.innerHTML = `<div class="page-head"><h1>Paramètres</h1></div><div class="grid grid-3">
         ${Store.mode === "firebase" ? `<div class="card"><h3>Mon mot de passe</h3><p class="muted">Compte administrateur : <b>${esc(Store.me.email)}</b>. Un lien pour changer le mot de passe vous sera envoyé par e-mail.</p><button class="btn" id="apwlink">Recevoir le lien</button></div>` : `<div class="card"><h3>Mot de passe administrateur</h3><form id="apw"><label>Nouveau mot de passe</label><input type="password" name="p1" minlength="8" required><label style="margin-top:10px">Confirmation</label><input type="password" name="p2" minlength="8" required><button class="btn" style="margin-top:12px">Modifier</button></form></div>`}
