@@ -102,17 +102,20 @@ const Store = {
     return this.fs.collection("users").doc(obj.uid).set({ role, refId: obj.id, section: col === "students" ? sectionOf(obj) : "", email: (obj.email || "").toLowerCase() }, { merge: true });
   },
   put(col, obj) {
+    Journal.track(col, obj, !(obj.id && this.get(col, obj.id)));
     this._local(col, obj);
     if (this.mode === "firebase") this._remote(col, obj).catch(Store._fbErr);
     return obj;
   },
   async putAwait(col, obj) {
+    Journal.track(col, obj, !(obj.id && this.get(col, obj.id)));
     this._local(col, obj);
     if (this.mode === "firebase") await this._remote(col, obj);
     return obj;
   },
   del(col, id) {
     const old = this.get(col, id);
+    Journal.track(col, old || { id }, false, true);
     this.data[col] = this.all(col).filter((x) => x.id !== id);
     this._persist();
     if (this.mode === "firebase") {
@@ -292,10 +295,82 @@ const Auth = {
     return u;
   },
   async logout() {
+    await Journal.log("Déconnexion", "", { now: true });
     if (Store.mode === "firebase") { try { await Store.auth.signOut(); } catch (e) { console.error(e); } }
     sessionStorage.removeItem(this.KEY); location.href = "index.html";
   }
 };
+
+/* ---------------- Journal d'activité ----------------
+   Chaque action (connexion, consultation, création, modification, suppression)
+   est enregistrée dans la collection « logs » (lisible par l'administrateur seul). */
+const LOG_LABELS = { contents: "Contenu pédagogique", sessions: "Feuille de présence", messages: "Message", visios: "Séance Teams", timetable: "Créneau d'emploi du temps",
+  students: "Fiche étudiant", profs: "Fiche enseignant", modules: "Module", notifications: "Notification", exams: "Examen", soutenances: "Soutenance" };
+const Journal = {
+  queue: [], timer: null, _lastView: "",
+  who() {
+    const u = (() => { try { return Auth.user(); } catch { return null; } })();
+    const me = Store.me || {};
+    const role = u ? u.role : me.role || "";
+    return { uid: Store.mode === "firebase" && Store.auth && Store.auth.currentUser ? Store.auth.currentUser.uid : "", role,
+      userId: u ? u.id : me.refId || "", nom: u ? (role === "admin" ? "Administrateur" : `${u.prenom || ""} ${u.nom || ""}`.trim()) : "",
+      email: (u && u.email) || me.email || "" };
+  },
+  device() {
+    const a = navigator.userAgent; const b = /Edg\//.test(a) ? "Edge" : /OPR\//.test(a) ? "Opera" : /Firefox\//.test(a) ? "Firefox" : /Chrome\//.test(a) ? "Chrome" : /Safari\//.test(a) ? "Safari" : "Navigateur";
+    const o = /Android/.test(a) ? "Android" : /iPhone|iPad/.test(a) ? "iOS" : /Windows/.test(a) ? "Windows" : /Mac OS/.test(a) ? "macOS" : /Linux/.test(a) ? "Linux" : "";
+    return `${b}${o ? " · " + o : ""}${/Mobi/.test(a) ? " (mobile)" : ""}`;
+  },
+  describe(col, o) {
+    if (!o) return "";
+    const s = (x) => String(x || "").replace(/\s+/g, " ").trim();
+    switch (col) {
+      case "messages": return `${s(o.module) === "ALL" ? "Annonces" : s(o.module)} · ${s(o.section)} : ${s(o.text).slice(0, 90)}`;
+      case "contents": return `${s(o.module)} · ${S2I.typesContenu[o.type] || ""} « ${s(o.titre)} »${o.statut ? ` (${({ publie: "publié", brouillon: "non publié", desactive: "désactivé" })[o.statut] || o.statut})` : ""}`;
+      case "sessions": { const r = Object.values(o.records || {}); return `${s(o.module)} · ${s(o.section)} · ${fmtDate(o.date)} ${s(o.debut)}${r.length ? ` — ${r.filter((x) => x === "A").length} absent(s) / ${r.length}` : ""}`; }
+      case "visios": return `${s(o.module)} · ${(o.sections || []).join(", ")} · ${fmtDate(o.date)} ${s(o.debut)} « ${s(o.titre)} »${o.statut === "annulee" ? " (annulée)" : ""}`;
+      case "timetable": return `${s(o.section)} · ${S2I.jours[(o.jour || 1) - 1] || ""} ${s(o.debut)}–${s(o.fin)} · ${s(o.module)}`;
+      case "students": case "profs": return `${s(o.prenom)} ${s(o.nom)}${o.email ? ` <${s(o.email)}>` : ""}`;
+      case "notifications": return `« ${s(o.titre)} »`;
+      case "exams": return `${s(o.module)} · ${s(o.section)} · ${fmtDate(o.date)}`;
+      case "soutenances": return `${s(o.etudiant)} · ${fmtDate(o.date)}`;
+      default: return s(o.titre || o.code || o.id);
+    }
+  },
+  track(col, obj, isNew, isDel) {
+    if (!LOG_LABELS[col]) return;
+    let action = isDel ? "Suppression" : isNew ? "Création" : "Modification";
+    if (col === "messages" && isNew) action = obj.system ? "Annonce automatique" : "Message envoyé";
+    if (col === "contents" && !isNew && !isDel) { const old = Store.get(col, obj.id); if (old && old.statut !== obj.statut && obj.statut === "publie") action = "Publication"; }
+    if (col === "sessions" && !isDel) action = isNew ? "Feuille de présence créée" : "Appel enregistré";
+    this.log(action, this.describe(col, obj), { objet: LOG_LABELS[col], ref: `${col}/${obj.id || ""}` });
+  },
+  log(action, detail = "", opt = {}) {
+    try {
+      const w = this.who(); if (!w.role || w.role === "disabled") return Promise.resolve();
+      const e = { id: uid(), date: new Date().toISOString(), ...w, action, objet: opt.objet || "", detail: String(detail).slice(0, 300), ref: opt.ref || "",
+        page: location.pathname.split("/").pop() || "index.html", appareil: this.device() };
+      this.queue.push(e);
+      if (opt.now) return this.flush();
+      clearTimeout(this.timer); this.timer = setTimeout(() => this.flush(), 1200);
+    } catch (err) { console.error(err); }
+    return Promise.resolve();
+  },
+  /* Regroupe les opérations en série (import Excel, passage de promotion…) */
+  async flush() {
+    clearTimeout(this.timer); let q = this.queue; this.queue = []; if (!q.length) return;
+    const groups = {}; q.forEach((e) => { const k = e.action + "|" + e.objet; (groups[k] = groups[k] || []).push(e); });
+    q = Object.values(groups).flatMap((g) => g.length > 5 && g[0].objet ? [{ ...g[0], action: g[0].action + " groupée", detail: `${g.length} élément(s) — ${g.slice(0, 3).map((x) => x.detail).join(" ; ")}…` }] : g);
+    if (Store.mode === "firebase") {
+      if (!Store.fs || !Store.auth || !Store.auth.currentUser) return;
+      const b = Store.fs.batch(); q.forEach((e) => b.set(Store.fs.collection("logs").doc(e.id), e));
+      try { await Promise.race([b.commit(), new Promise((r) => setTimeout(r, 2500))]); } catch (err) { console.warn("Journal :", err.code || err); }
+    } else {
+      const L = (Store.data.logs = Store.data.logs || []); L.push(...q); if (L.length > 3000) L.splice(0, L.length - 3000); Store._persist();
+    }
+  }
+};
+window.addEventListener("pagehide", () => { if (Journal.queue.length) Journal.flush(); });
 
 /* ---------------- Interface ---------------- */
 const UI = {
@@ -370,6 +445,7 @@ function mountApp(user, roleLabel, views) {
     if (Store.mode !== "firebase" && fresh && fresh.mustChange && views.some((x) => x.id === "profil")) v = views.find((x) => x.id === "profil");
     $$(".sidebar a").forEach((a) => a.classList.toggle("active", a.dataset.v === v.id));
     const main = $("#main"); main.innerHTML = "";
+    if (Journal._lastView !== v.id) { Journal._lastView = v.id; Journal.log("Consultation", `${roleLabel} › ${v.label.replace(/<[^>]+>/g, "")}`); }
     v.render(main);
     refreshBadges(views);
   };
