@@ -272,3 +272,27 @@ table.form-row td, table.form-row th { border-right: 1px solid var(--line); }
   .logos .sep { height: 30px; }
   .topbar .right .who-name { display: none; }
 }
+
+/* Séances à distance (Microsoft Teams) */
+.btn.teams { background: #5b5fc7; border-color: #5b5fc7; color: #fff; display: inline-flex; align-items: center; gap: 6px; }
+.btn.teams:hover { background: #4f52b2; }
+.btn.teams-o { border-color: #5b5fc7; color: #5b5fc7; }
+.teams-ico { width: 16px; height: 16px; flex-shrink: 0; }
+.pill.live { background: #e3f4ea; color: var(--ok); animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+.teams-step { display: flex; gap: 12px; align-items: flex-start; background: #f5f5fd; border: 1px solid #dcdcf4; border-radius: 8px; padding: 12px 14px; }
+.teams-step .step-n { width: 26px; height: 26px; border-radius: 50%; background: #5b5fc7; color: #fff; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
+.teams-step .hint { margin: 2px 0 8px; }
+.teams-step .inline-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin-bottom: 8px; }
+.teams-step .inline-check input { width: auto; }
+.visio-card { display: flex; gap: 14px; align-items: center; border: 1px solid var(--line); border-left: 4px solid #5b5fc7; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+.visio-card.live { border-left-color: var(--ok); background: #f4fbf6; }
+.visio-card.off { opacity: .6; border-left-color: #bbb; }
+.visio-card .vc-date { text-align: center; min-width: 56px; color: var(--navy); }
+.visio-card .vc-date b { display: block; font-size: 18px; }
+.visio-card .vc-date span { font-size: 13px; color: var(--muted); }
+.visio-card .vc-body { flex: 1; min-width: 0; }
+.visio-card h4 { margin: 4px 0 2px; font-size: 15px; }
+@media (max-width: 640px) { .visio-card { flex-wrap: wrap; } .visio-card .vc-act { width: 100%; } }
+
+.btn:disabled { opacity: .4; cursor: default; pointer-events: none; }
