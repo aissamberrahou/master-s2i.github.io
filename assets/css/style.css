@@ -296,3 +296,11 @@ table.form-row td, table.form-row th { border-right: 1px solid var(--line); }
 @media (max-width: 640px) { .visio-card { flex-wrap: wrap; } .visio-card .vc-act { width: 100%; } }
 
 .btn:disabled { opacity: .4; cursor: default; pointer-events: none; }
+
+/* Journal d'activité */
+.jbar { height: 10px; background: #eef1f6; border-radius: 5px; overflow: hidden; }
+.jbar span { display: block; height: 100%; background: var(--navy); border-radius: 5px; }
+table.journal td { vertical-align: top; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 14px; }
+.filters .f { min-width: 160px; }
+.filters label { display: block; font-size: 12.5px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
