@@ -31,7 +31,7 @@ img { max-width: 100%; }
 .topbar .wrap { display: flex; align-items: center; gap: 18px; padding: 10px 24px; max-width: 1240px; margin: 0 auto; }
 .logos { display: flex; align-items: center; gap: 16px; }
 .logos img { height: 60px; width: auto; }
-.logos .logo-s2i { height: 62px; }
+.logos .logo-s2i { height: 72px; }
 .logos .sep { width: 1px; height: 42px; background: var(--line); }
 .logo-txt { display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 12px; border: 2px solid var(--navy); color: var(--navy); font-weight: 700; letter-spacing: .06em; border-radius: 4px; font-size: 13px; }
 .topbar .right { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 14px; }
@@ -64,7 +64,9 @@ img { max-width: 100%; }
 .card h3 { margin-top: 0; font-size: 19px; }
 .card.accent { border-top: 3px solid var(--garnet); }
 .space-card { display: flex; flex-direction: column; }
-.space-card .ico { width: 46px; height: 46px; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-size: 22px; margin-bottom: 12px; }
+.space-card .ico { position: relative; width: 58px; height: 58px; margin-bottom: 12px; }
+.space-card .ico img { width: 58px; height: 58px; display: block; }
+.space-card .ico .role { position: absolute; right: -8px; bottom: -6px; width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px solid var(--line); display: grid; place-items: center; font-size: 15px; }
 .space-card ul { padding-left: 18px; margin: 0 0 16px; flex: 1; }
 .kpis { display: flex; gap: 36px; flex-wrap: wrap; margin-top: 30px; }
 .kpis b { display: block; font-family: var(--serif); font-size: 34px; color: #fff; }
@@ -114,6 +116,8 @@ textarea { min-height: 90px; resize: vertical; }
 .login-wrap { min-height: calc(100vh - 140px); display: grid; place-items: center; background: var(--bg); padding: 30px 16px; }
 .login-box { width: 100%; max-width: 420px; background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--garnet); border-radius: var(--radius); padding: 28px; }
 .login-box h1 { font-size: 24px; margin: 0 0 4px; }
+.login-box .login-ico { display: block; width: 76px; height: auto; margin: 0 auto 12px; }
+.login-box h1, .login-box > .muted { text-align: center; }
 .role-tabs { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin: 18px 0; }
 .role-tabs button { flex: 1; border: 0; background: #fff; padding: 9px; font: 500 14px var(--sans); color: var(--navy); cursor: pointer; }
 .role-tabs button.active { background: var(--navy); color: #fff; }
@@ -125,6 +129,7 @@ textarea { min-height: 90px; resize: vertical; }
 .app { display: flex; min-height: calc(100vh - 118px); }
 .sidebar { width: 236px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--line); padding: 16px 0; }
 .sidebar .who { padding: 0 18px 14px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.sidebar .who .side-ico { display: block; width: 52px; height: auto; margin-bottom: 8px; }
 .sidebar .who b { display: block; color: var(--navy); }
 .sidebar .who span { font-size: 12.5px; color: var(--muted); }
 .sidebar a { display: flex; align-items: center; justify-content: space-between; padding: 9px 18px; color: var(--garnet); font-size: 14.5px; border-left: 3px solid transparent; }

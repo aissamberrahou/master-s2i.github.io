@@ -347,7 +347,7 @@ function renderFooter() {
 /* ---------------- Application à barre latérale ---------------- */
 function mountApp(user, roleLabel, views) {
   const app = document.getElementById("app");
-  app.innerHTML = `<aside class="sidebar"><div class="who"><b>${esc((user.prenom ? user.prenom + " " : "") + user.nom)}</b><span>${esc(roleLabel)}</span></div>
+  app.innerHTML = `<aside class="sidebar"><div class="who"><img class="side-ico" src="assets/img/logo-s2i-icon.svg" alt="Master S2I"><b>${esc((user.prenom ? user.prenom + " " : "") + user.nom)}</b><span>${esc(roleLabel)}</span></div>
     ${views.map((v) => `<a href="#${v.id}" data-v="${v.id}"><span>${v.label}</span><span class="badge" data-badge="${v.id}" hidden></span></a>`).join("")}</aside>
     <section class="main" id="main"></section>`;
   const show = () => {
