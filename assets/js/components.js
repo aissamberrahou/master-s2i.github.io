@@ -228,7 +228,7 @@ function ChatView(el, ctx) {
       <div class="thread"><div class="panel-h" style="border-radius:0">${esc(UI.moduleLabel(st.cur.module))}${st.cur.module !== "ALL" ? ` — ${st.cur.section}` : ""}</div>
         <div class="msgs" id="msgs">${msgs.length ? msgs.map((m) => {
           const me = m.authorId === ctx.user.id && m.authorRole === ctx.role;
-          return `<div class="msg ${me ? "me" : ""} ${m.authorRole === "prof" || m.authorRole === "admin" ? "prof" : ""} ${m.system ? "sys" : ""}"><div class="meta">${esc(m.authorName)} · ${fmtDateTime(m.date)}</div><div class="bubble">${esc(m.text)}</div></div>`; }).join("") : `<div class="empty">Aucun message pour l'instant.</div>`}</div>
+          return `<div class="msg ${me ? "me" : ""} ${m.authorRole === "prof" || m.authorRole === "admin" ? "prof" : ""} ${m.system ? "sys" : ""}"><div class="meta">${esc(m.authorName)} · ${fmtDateTime(m.date)}</div><div class="bubble">${linkify(m.text)}</div></div>`; }).join("") : `<div class="empty">Aucun message pour l'instant.</div>`}</div>
         ${canWrite ? `<form id="chat-f"><textarea name="t" placeholder="Écrire un message… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)" required></textarea><button class="btn">Envoyer</button></form>` : `<div class="muted" style="padding:10px">Canal en lecture seule.</div>`}</div></div>`;
     const box = $("#msgs", el); box.scrollTop = box.scrollHeight;
     $$("[data-k]", el).forEach((a) => a.onclick = () => { st.cur = ctx.channels.find((c) => Chat.key(c) === a.dataset.k); draw(); });
@@ -258,17 +258,18 @@ function TimetableView(el, { sections, profId, title = "Emploi du temps", onWeek
   const st = { section: sections[0] };
   const draw = () => {
     const mon = TTWeek.monday;
-    const rows = Store.all("timetable").filter((t) => (profId ? t.profId === profId : t.section === st.section) && slotInWeek(t, mon));
+    const vs = typeof Visio !== "undefined" ? Visio.slots() : [];
+    const rows = [...Store.all("timetable"), ...vs].filter((t) => (profId ? t.profId === profId : t.section === st.section) && slotInWeek(t, mon));
     const nbDist = rows.filter((r) => r.mode === "distance").length;
     el.innerHTML = `<div class="page-head"><h1>${esc(title)}</h1><div class="toolbar">
         ${!profId && sections.length > 1 ? `<select id="tt-sec" style="width:auto">${sections.map((s) => `<option ${s === st.section ? "selected" : ""}>${s}</option>`).join("")}</select>` : ""}
-        <div class="week-nav"><button class="btn outline sm" data-w="-7">‹</button><b>${weekLabel(mon)}</b><button class="btn outline sm" data-w="7">›</button><button class="btn outline sm" data-w="0">Cette semaine</button></div></div></div>
+        <div class="week-nav"><button class="btn outline sm" data-w="-7" ${shiftISO(mon, -7) < edtStart() ? "disabled title=\"Début de l'emploi du temps\"" : ""}>‹</button><b>${weekLabel(mon)}</b><button class="btn outline sm" data-w="7">›</button><button class="btn outline sm" data-w="0">Cette semaine</button></div></div></div>
       ${rows.length ? `<p class="muted">${rows.length} séance(s) cette semaine${nbDist ? ` dont ${nbDist} à distance` : ""}.</p>
       <div class="table-scroll"><div class="tt">${S2I.jours.map((j, i) => { const date = shiftISO(mon, i);
         return `<div class="day ${date === todayISO() ? "today" : ""}"><h4>${j}<small>${fmtDate(date)}</small></h4>${rows.filter((r) => +r.jour === i + 1).sort((a, b) => a.debut.localeCompare(b.debut))
         .map((r) => `<div class="slot ${r.mode === "distance" ? "dist" : ""}"><span class="t">${r.debut} – ${r.fin}</span><b>${esc(r.module)}</b>${esc((Store.get("modules", r.module) || {}).titre || "")}
           <div class="muted">${r.mode === "distance" ? "" : esc(r.salle)}${profId ? ` · ${r.section}` : UI.teacherOf(r) ? ` · ${esc(UI.teacherOf(r))}` : ""}</div>
-          <div style="margin-top:4px">${modePill(r.mode, r.lien)}${r.semaine ? ' <span class="pill draft" title="Séance propre à cette semaine">ponctuelle</span>' : ""}</div></div>`).join("") || '<div class="muted" style="text-align:center">—</div>'}</div>`; }).join("")}</div></div>`
+          <div style="margin-top:4px">${modePill(r.mode, r.lien)}${r.visio ? ' <span class="pill t-cours">Teams</span>' : r.semaine ? ' <span class="pill draft" title="Séance propre à cette semaine">ponctuelle</span>' : ""}</div></div>`).join("") || '<div class="muted" style="text-align:center">—</div>'}</div>`; }).join("")}</div></div>`
       : `<div class="alert info">Aucune séance programmée pour cette semaine.</div>`}`;
     const s = $("#tt-sec", el); if (s) s.onchange = (e) => { st.section = e.target.value; draw(); };
     $$("[data-w]", el).forEach((b) => b.onclick = () => { const n = +b.dataset.w; TTWeek.monday = n ? shiftISO(TTWeek.monday, n) : mondayOf(); draw(); if (onWeek) onWeek(); });

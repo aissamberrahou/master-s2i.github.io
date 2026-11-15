@@ -1,7 +1,7 @@
 /* ==========================================================================
    Noyau : stockage, authentification, utilitaires d'interface
    ========================================================================== */
-const COLS = ["profs", "students", "contents", "sessions", "messages", "timetable", "exams", "soutenances", "modules", "notifications"];
+const COLS = ["profs", "students", "contents", "sessions", "messages", "timetable", "exams", "soutenances", "modules", "notifications", "visios"];
 const DB_KEY = "s2i_db_v1";
 
 /* ---------------- Utilitaires ---------------- */
@@ -13,6 +13,7 @@ const pad = (n) => String(n).padStart(2, "0");
 const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const todayISO = () => isoDate(new Date());
 const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return isoDate(d); };
+const linkify = (t) => esc(t).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u.length > 60 ? u.slice(0, 57) + "…" : u}</a>`);
 const fmtDate = (s) => { if (!s) return ""; const [y, m, d] = s.slice(0, 10).split("-"); return `${d}/${m}/${y}`; };
 const fmtDateTime = (s) => { const d = new Date(s); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const yearOfModule = (code) => { const m = S2I.modules.find((x) => x.code === code); return m ? (m.sem <= 2 ? 1 : 2) : 1; };
@@ -23,13 +24,17 @@ const sectionsOfYear = (y) => [`TN-${y}A`, `TAM-${y}A`];
 const mondayOf = (iso) => { const d = iso ? new Date(iso + "T12:00:00") : new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return isoDate(d); };
 const shiftISO = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoDate(d); };
 const weekLabel = (mon) => `Semaine du ${fmtDate(mon)} au ${fmtDate(shiftISO(mon, 5))}`;
-const slotInWeek = (t, mon) => (t.semaine ? t.semaine === mon : !(t.exceptions || []).includes(mon));
-const TTWeek = { monday: mondayOf() };
+/* Début de l'emploi du temps : les semaines antérieures ne sont plus affichées */
+const EDT_START = "2026-11-16";
+const edtStart = () => ((typeof Store !== "undefined" && Store.data && Store.data.settings && Store.data.settings.edtDebut) || EDT_START);
+const clampWeek = (w) => (w < edtStart() ? edtStart() : w);
+const slotInWeek = (t, mon) => mon >= edtStart() && (t.semaine ? t.semaine === mon : !(t.exceptions || []).includes(mon));
+const TTWeek = { _m: mondayOf(), get monday() { return clampWeek(this._m); }, set monday(v) { this._m = clampWeek(v); } };
 function weekOptions(selected) {
   const base = mondayOf(); const set = new Set();
   for (let i = -8; i <= 30; i++) set.add(shiftISO(base, 7 * i));
   if (selected) set.add(selected);
-  return [["", "Toutes les semaines (récurrent)"], ...[...set].sort().map((w) => [w, weekLabel(w)])];
+  return [["", "Toutes les semaines (récurrent)"], ...[...set].filter((w) => w >= edtStart()).sort().map((w) => [w, weekLabel(w)])];
 }
 const MODES = { presentiel: "Présentiel", distance: "À distance" };
 function modePill(mode, lien) {
@@ -163,7 +168,7 @@ const Store = {
     if (r === "admin" || r === "prof") {
       await Promise.all(COLS.map(async (c) => { this.data[c] = await col(c); }));
     } else if (r === "student") {
-      await Promise.all(["modules", "profs", "timetable", "exams", "soutenances", "notifications"].map(async (c) => { this.data[c] = await col(c); }));
+      await Promise.all(["modules", "profs", "timetable", "exams", "soutenances", "notifications", "visios"].map(async (c) => { this.data[c] = await col(c); }));
       const own = await this.fs.collection("students").doc(this.me.refId).get();
       this.data.students = own.exists ? [own.data()] : [];
       this.data.sessions = docs(await this.fs.collection("sessions").where("section", "==", sec).get());
