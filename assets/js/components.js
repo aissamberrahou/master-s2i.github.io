@@ -216,8 +216,9 @@ const Chat = {
 function ChatView(el, ctx) {
   const st = { cur: ctx.channels[0] };
   const label = (c) => c.module === "ALL" ? "📢 Annonces générales" : `${c.module} · ${c.section}`;
-  const draw = () => {
+  const draw = (keepDraft) => {
     if (!st.cur) { el.innerHTML = `<div class="alert warn">Aucun canal disponible.</div>`; return; }
+    const prev = $("#chat-f textarea", el); const draft = keepDraft && prev ? prev.value : "";
     Chat.markSeen(ctx.user, Chat.key(st.cur));
     const msgs = Chat.msgsOf(st.cur);
     const canWrite = st.cur.module !== "ALL" || ctx.role === "admin";
@@ -241,10 +242,14 @@ function ChatView(el, ctx) {
       };
       f.onsubmit = (e) => { e.preventDefault(); send(); };
       f.t.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
+      if (draft) f.t.value = draft;
       f.t.focus();
     }
     if (ctx.onRead) ctx.onRead();
   };
+  // Mise à jour en direct (mode Firebase) : nouveaux messages des autres utilisateurs
+  Chat.onUpdate = () => { if (el.isConnected) draw(true); };
+  if (!Chat._hooked) { Chat._hooked = true; Store.onChange((c) => { if (c === "messages" && Chat.onUpdate) Chat.onUpdate(); }); }
   draw();
 }
 
@@ -289,6 +294,24 @@ function ExamsView(el, { sections }) {
 
 /* ---------- Profil : changement de mot de passe ---------- */
 function ProfileView(el, user, col) {
+  if (Store.mode === "firebase") {
+    el.innerHTML = `<div class="page-head"><h1>Mon profil</h1></div>
+      <div class="card" style="max-width:520px"><p><b>${esc(user.prenom)} ${esc(user.nom)}</b><br><span class="muted">Connexion : ${esc(Store.me.email)}</span></p>
+      <form id="pw" class="form-grid"><div class="full"><label>Mot de passe actuel</label><input type="password" name="old" required autocomplete="current-password"></div>
+      <div><label>Nouveau mot de passe</label><input type="password" name="n1" minlength="8" required autocomplete="new-password"></div>
+      <div><label>Confirmation</label><input type="password" name="n2" minlength="8" required autocomplete="new-password"></div>
+      <div class="full"><button class="btn">Changer le mot de passe</button></div></form></div>`;
+    $("#pw", el).onsubmit = async (e) => {
+      e.preventDefault(); const f = e.target;
+      if (f.n1.value !== f.n2.value) return UI.toast("Les deux mots de passe diffèrent.");
+      try {
+        const u = Store.auth.currentUser;
+        await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, f.old.value));
+        await u.updatePassword(f.n1.value); f.reset(); UI.toast("Mot de passe modifié.");
+      } catch (err) { UI.toast(err.code === "auth/wrong-password" || err.code === "auth/invalid-credential" ? "Mot de passe actuel incorrect." : "Échec : " + err.message); }
+    };
+    return;
+  }
   const must = (Store.get(col, user.id) || {}).mustChange;
   el.innerHTML = `<div class="page-head"><h1>Mon profil</h1></div>
     ${must ? `<div class="alert warn" style="max-width:520px;margin-bottom:14px">Bienvenue ! Pour sécuriser votre compte, choisissez un nouveau mot de passe avant d'utiliser la plateforme. Le mot de passe actuel est celui reçu par e-mail.</div>` : ""}

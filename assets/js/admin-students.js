@@ -58,6 +58,10 @@ function StudentsAdmin(el, { actifField, withPassword, afterSave, credsColumn, c
     if (action === "mail") {
       const act = members.filter((s) => !s.inactif); const noSent = act.filter((s) => !s.credsSentAt);
       const target = noSent.length && noSent.length < act.length && UI.confirm(`${noSent.length} étudiant(s) de ${label} n'ont jamais reçu leurs identifiants.\nOK = ne traiter que ceux-là · Annuler = tous les ${act.length} étudiants actifs`) ? noSent : act;
+      if (Store.mode === "firebase") {
+        if (!UI.confirm(`Envoyer l'e-mail d'activation (création de l'accès si besoin) à ${target.length} étudiant(s) de ${label} ?`)) return;
+        activateAccountsDialog(target.map((s) => ({ kind: "student", account: s })), { title: `Accès — ${label}`, onClose: refresh }); return;
+      }
       if (!UI.confirm(`Générer de nouveaux mots de passe provisoires pour ${target.length} étudiant(s) et les envoyer par e-mail ?\nLeurs anciens mots de passe ne fonctionneront plus.`)) return;
       const items = []; for (const s of target) items.push(await resetCredentials("student", s));
       sendCredentialsDialog(items, { title: `Identifiants — ${label}`, onClose: refresh }); refresh(); return;

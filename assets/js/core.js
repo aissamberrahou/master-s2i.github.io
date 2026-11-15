@@ -50,12 +50,17 @@ const Store = {
   data: null,
   mode: "local",
   fs: null,
+  auth: null,
+  me: null, // mode Firebase : { uid, email, role, refId, section }
+  listeners: [],
 
   async init() {
     const cfg = window.FIREBASE_CONFIG;
     if (cfg && cfg.apiKey) {
-      try { await this._initFirebase(cfg); this.mode = "firebase"; return; }
-      catch (e) { console.error("Firebase indisponible, passage en mode local :", e); }
+      this.mode = "firebase";
+      try { await this._initFirebase(cfg); }
+      catch (e) { console.error(e); this.data = this.data || { settings: {} }; this._ensure(); setTimeout(() => UI.toast("Connexion à la base impossible : " + (e.message || e)), 300); }
+      return;
     }
     const raw = localStorage.getItem(DB_KEY);
     if (raw) { this.data = JSON.parse(raw); this._ensure(); }
@@ -68,26 +73,52 @@ const Store = {
     try { localStorage.setItem(DB_KEY, JSON.stringify(this.data)); }
     catch (e) { UI.toast("Stockage du navigateur plein : utilisez des liens plutôt que des fichiers joints."); throw e; }
   },
+  onChange(fn) { this.listeners.push(fn); },
+  _emit(col) { this.listeners.forEach((fn) => { try { fn(col); } catch (e) { console.error(e); } }); },
 
   all(col) { return this.data[col] || []; },
   get(col, id) { return this.all(col).find((x) => x.id === id); },
-  put(col, obj) {
+  _local(col, obj) {
     if (!obj.id) obj.id = uid();
     const arr = this.all(col); const i = arr.findIndex((x) => x.id === obj.id);
     if (i >= 0) arr[i] = obj; else arr.push(obj);
     this._persist();
-    if (this.mode === "firebase") this.fs.collection(col).doc(obj.id).set(JSON.parse(JSON.stringify(obj))).catch(Store._fbErr);
+  },
+  /* Écriture en ligne (mode Firebase) : renvoie une promesse */
+  _remote(col, obj) {
+    if (col === "messages" && !obj.authorUid && this.auth && this.auth.currentUser) obj.authorUid = this.auth.currentUser.uid;
+    const clean = JSON.parse(JSON.stringify(obj)); delete clean.passHash; delete clean.password;
+    const jobs = [this.fs.collection(col).doc(String(obj.id)).set(clean)];
+    if ((col === "students" || col === "profs") && obj.uid && this.me && this.me.role === "admin") jobs.push(this._syncProfile(col, obj));
+    return Promise.all(jobs);
+  },
+  _syncProfile(col, obj) {
+    const role = obj.inactif ? "disabled" : col === "students" ? "student" : "prof";
+    return this.fs.collection("users").doc(obj.uid).set({ role, refId: obj.id, section: col === "students" ? sectionOf(obj) : "", email: (obj.email || "").toLowerCase() }, { merge: true });
+  },
+  put(col, obj) {
+    this._local(col, obj);
+    if (this.mode === "firebase") this._remote(col, obj).catch(Store._fbErr);
+    return obj;
+  },
+  async putAwait(col, obj) {
+    this._local(col, obj);
+    if (this.mode === "firebase") await this._remote(col, obj);
     return obj;
   },
   del(col, id) {
+    const old = this.get(col, id);
     this.data[col] = this.all(col).filter((x) => x.id !== id);
     this._persist();
-    if (this.mode === "firebase") this.fs.collection(col).doc(id).delete().catch(Store._fbErr);
+    if (this.mode === "firebase") {
+      this.fs.collection(col).doc(String(id)).delete().catch(Store._fbErr);
+      if ((col === "students" || col === "profs") && old && old.uid) this.fs.collection("users").doc(old.uid).delete().catch(Store._fbErr);
+    }
   },
   settings() { return this.data.settings; },
   saveSettings() {
     this._persist();
-    if (this.mode === "firebase") this.fs.collection("settings").doc("main").set(this.data.settings).catch(Store._fbErr);
+    if (this.mode === "firebase") this.fs.collection("config").doc("settings").set(JSON.parse(JSON.stringify(this.data.settings))).catch(Store._fbErr);
   },
   exportJSON() { return JSON.stringify(this.data, null, 2); },
   async importJSON(obj) {
@@ -95,37 +126,68 @@ const Store = {
     delete obj._meta; obj.settings = obj.settings || {};
     // Ne pas perdre le mot de passe administrateur ni la configuration e-mail si le fichier ne les contient pas
     ["adminHash", "email", "mailTemplates"].forEach((k) => { if (obj.settings[k] === undefined && keep[k] !== undefined) obj.settings[k] = keep[k]; });
+    if (this.mode === "firebase") { await this._upsertAll(obj); return; }
     this.data = obj; this._ensure(); this._persist();
-    if (this.mode === "firebase") await this._pushAll();
   },
   async reset() {
+    if (this.mode === "firebase") throw new Error("La réinitialisation est désactivée en mode Firebase.");
     this.data = await buildSeed(); this._persist();
-    if (this.mode === "firebase") await this._pushAll();
   },
 
-  _fbErr(e) { console.error(e); UI.toast("Erreur d'enregistrement en ligne : " + e.message); },
+  _fbErr(e) { console.error(e); UI.toast("Erreur d'enregistrement en ligne : " + (e.code === "permission-denied" ? "action non autorisée" : e.message)); },
   async _initFirebase(cfg) {
     const v = "10.12.2";
     await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-app-compat.js`);
+    await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-auth-compat.js`);
     await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore-compat.js`);
-    firebase.initializeApp(cfg);
-    this.fs = firebase.firestore();
-    this.data = { settings: {} };
-    for (const c of COLS) {
-      const snap = await this.fs.collection(c).get();
-      this.data[c] = snap.docs.map((d) => d.data());
-    }
-    const s = await this.fs.collection("settings").doc("main").get();
-    if (s.exists) this.data.settings = s.data();
-    if (!this.data.settings.adminHash) { this.data = await buildSeed(); await this._pushAll(); }
+    if (!firebase.apps.find((a) => a.name === "[DEFAULT]")) firebase.initializeApp(cfg);
+    this.auth = firebase.auth(); this.fs = firebase.firestore();
+    this.data = { settings: {} }; this._ensure();
+    const user = await new Promise((res) => { const off = this.auth.onAuthStateChanged((u) => { off(); res(u); }); });
+    if (!user) return;
+    await this._loadProfile(user);
+    if (this.me) await this.loadData();
   },
-  async _pushAll() {
-    for (const c of COLS) {
-      const snap = await this.fs.collection(c).get();
-      for (const d of snap.docs) await d.ref.delete();
-      for (const o of this.data[c]) await this.fs.collection(c).doc(o.id).set(JSON.parse(JSON.stringify(o)));
+  async _loadProfile(user) {
+    const snap = await this.fs.collection("users").doc(user.uid).get();
+    this.me = snap.exists ? { uid: user.uid, email: user.email, ...snap.data() } : null;
+    return this.me;
+  },
+  async loadData() {
+    const docs = (snap) => snap.docs.map((d) => d.data());
+    const col = (c) => this.fs.collection(c).get().then(docs);
+    const r = this.me.role; const sec = this.me.section;
+    const conf = await this.fs.collection("config").doc("settings").get();
+    this.data = { settings: conf.exists ? conf.data() : {} };
+    if (r === "admin" || r === "prof") {
+      await Promise.all(COLS.map(async (c) => { this.data[c] = await col(c); }));
+    } else if (r === "student") {
+      await Promise.all(["modules", "profs", "timetable", "exams", "soutenances", "notifications"].map(async (c) => { this.data[c] = await col(c); }));
+      const own = await this.fs.collection("students").doc(this.me.refId).get();
+      this.data.students = own.exists ? [own.data()] : [];
+      this.data.sessions = docs(await this.fs.collection("sessions").where("section", "==", sec).get());
+      this.data.contents = docs(await this.fs.collection("contents").where("statut", "==", "publie").get());
+      this.data.messages = docs(await this.fs.collection("messages").where("section", "in", [sec, "ALL"]).get());
     }
-    await this.fs.collection("settings").doc("main").set(this.data.settings);
+    this._ensure();
+    this._watchMessages();
+  },
+  _watchMessages() {
+    const r = this.me.role;
+    const q = r === "student" ? this.fs.collection("messages").where("section", "in", [this.me.section, "ALL"]) : this.fs.collection("messages");
+    q.onSnapshot((snap) => { this.data.messages = snap.docs.map((d) => d.data()); this._emit("messages"); }, (e) => console.error(e));
+  },
+  async _upsertAll(obj) {
+    for (const c of COLS) {
+      const list = obj[c] || [];
+      for (let i = 0; i < list.length; i += 400) {
+        const batch = this.fs.batch();
+        list.slice(i, i + 400).forEach((d) => { const x = JSON.parse(JSON.stringify(d)); delete x.passHash; batch.set(this.fs.collection(c).doc(String(d.id)), x); });
+        await batch.commit();
+      }
+    }
+    const st = { ...obj.settings }; delete st.adminHash;
+    await this.fs.collection("config").doc("settings").set(st, { merge: true });
   }
 };
 
@@ -175,7 +237,26 @@ async function buildSeed() {
 /* ---------------- Authentification ---------------- */
 const Auth = {
   KEY: "s2i_session",
+  lastError: "",
   async login(role, ident, pwd) {
+    this.lastError = "";
+    if (Store.mode === "firebase") {
+      try {
+        const cred = await Store.auth.signInWithEmailAndPassword((ident || "").trim(), pwd);
+        const me = await Store._loadProfile(cred.user);
+        if (!me || me.role !== role) {
+          await Store.auth.signOut(); Store.me = null;
+          this.lastError = !me ? "Ce compte n'a pas encore d'accès à la plateforme. Contactez la coordination."
+            : me.role === "disabled" ? "Ce compte est désactivé."
+            : "Ce compte n'a pas accès à cet espace : choisissez le bon onglet.";
+          return null;
+        }
+        return { id: me.refId, role };
+      } catch (e) {
+        this.lastError = ["auth/too-many-requests"].includes(e.code) ? "Trop de tentatives : réessayez dans quelques minutes." : "E-mail ou mot de passe incorrect.";
+        return null;
+      }
+    }
     const h = await hashPwd(pwd);
     ident = (ident || "").trim().toLowerCase();
     if (role === "admin") return h === Store.settings().adminHash ? { id: "admin", nom: "Administrateur", prenom: "" } : null;
@@ -183,11 +264,19 @@ const Auth = {
     const u = Store.all(col).find((x) => (x.login || "").toLowerCase() === ident && !x.inactif);
     return u && u.passHash === h ? u : null;
   },
-  start(role, user) { sessionStorage.setItem(this.KEY, JSON.stringify({ role, id: user.id })); },
-  current() { try { return JSON.parse(sessionStorage.getItem(this.KEY)); } catch { return null; } },
+  async resetPassword(email) {
+    const url = (Store.settings().siteUrl || location.href.replace(/[^/]*([?#].*)?$/, "")) + "connexion.html";
+    await Store.auth.sendPasswordResetEmail(email.trim(), { url });
+  },
+  start(role, user) { if (Store.mode !== "firebase") sessionStorage.setItem(this.KEY, JSON.stringify({ role, id: user.id })); },
+  current() {
+    if (Store.mode === "firebase") return Store.me ? { role: Store.me.role, id: Store.me.refId } : null;
+    try { return JSON.parse(sessionStorage.getItem(this.KEY)); } catch { return null; }
+  },
   user() {
     const s = this.current(); if (!s) return null;
-    if (s.role === "admin") return { id: "admin", nom: "Administrateur", prenom: "", role: "admin" };
+    if (s.role === "admin") return { id: "admin", nom: "Administrateur", prenom: "", role: "admin", email: Store.me ? Store.me.email : "" };
+    if (s.role !== "prof" && s.role !== "student") return null;
     const u = Store.get(s.role === "prof" ? "profs" : "students", s.id);
     return u ? { ...u, role: s.role } : null;
   },
@@ -196,7 +285,10 @@ const Auth = {
     if (!u || u.role !== role) { location.href = "connexion.html?role=" + (role === "student" ? "etudiant" : role); return null; }
     return u;
   },
-  logout() { sessionStorage.removeItem(this.KEY); location.href = "index.html"; }
+  async logout() {
+    if (Store.mode === "firebase") { try { await Store.auth.signOut(); } catch (e) { console.error(e); } }
+    sessionStorage.removeItem(this.KEY); location.href = "index.html";
+  }
 };
 
 /* ---------------- Interface ---------------- */
@@ -261,13 +353,14 @@ function mountApp(user, roleLabel, views) {
     const id = location.hash.slice(1) || views[0].id;
     let v = views.find((x) => x.id === id) || views[0];
     const fresh = Auth.user();
-    if (fresh && fresh.mustChange && views.some((x) => x.id === "profil")) v = views.find((x) => x.id === "profil");
+    if (Store.mode !== "firebase" && fresh && fresh.mustChange && views.some((x) => x.id === "profil")) v = views.find((x) => x.id === "profil");
     $$(".sidebar a").forEach((a) => a.classList.toggle("active", a.dataset.v === v.id));
     const main = $("#main"); main.innerHTML = "";
     v.render(main);
     refreshBadges(views);
   };
   window.addEventListener("hashchange", show);
+  Store.onChange(() => refreshBadges(views));
   show();
 }
 function refreshBadges(views) {
@@ -304,6 +397,7 @@ function renderMonthCalendar(el, events, state = { y: new Date().getFullYear(), 
 
 /* ---------------- Formulaires et tableaux génériques (CRUD) ---------------- */
 function fieldHtml(f, val) {
+  if (f.type === "password" && Store.mode === "firebase") return "";
   const id = "f_" + f.key; const req = f.required ? "required" : "";
   const cls = f.full ? "full" : "";
   let input;

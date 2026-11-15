@@ -25,6 +25,7 @@
     <div class="field"><label for="pwd">Mot de passe</label><input id="pwd" type="password" required autocomplete="current-password"></div>
     <div class="err" id="err"></div>
     <button class="btn" style="width:100%;justify-content:center">Se connecter</button>
+    <p class="hint" id="forgot-p" hidden><a href="javascript:void 0" id="forgot">Mot de passe oublié ou premier accès ?</a></p>
     <p class="hint" id="demo"></p>
   </form>
 </div>
@@ -39,11 +40,22 @@
   await Store.init();
   const params = new URLSearchParams(location.search);
   let role = ["prof", "etudiant", "admin"].includes(params.get("role")) ? params.get("role") : "prof";
-  const labels = { prof: "Identifiant enseignant", etudiant: "Code étudiant", admin: "" };
+  const FB = Store.mode === "firebase";
+  const labels = FB ? { prof: "Adresse e-mail", etudiant: "Adresse e-mail", admin: "Adresse e-mail" } : { prof: "Identifiant enseignant", etudiant: "Code étudiant", admin: "" };
+  if (FB) {
+    document.getElementById("ident").type = "email";
+    document.getElementById("forgot-p").hidden = false;
+    document.getElementById("forgot").onclick = async () => {
+      const em = document.getElementById("ident").value.trim();
+      if (!em) { document.getElementById("err").textContent = "Saisissez d'abord votre adresse e-mail."; return; }
+      try { await Auth.resetPassword(em); document.getElementById("err").textContent = ""; UI.toast("Si un compte existe pour " + em + ", un e-mail de réinitialisation vient d'être envoyé."); }
+      catch (e) { document.getElementById("err").textContent = e.code === "auth/invalid-email" ? "Adresse e-mail invalide." : "Envoi impossible : " + e.message; }
+    };
+  }
   const setRole = (r) => {
     role = r;
     document.querySelectorAll("[data-r]").forEach((b) => b.classList.toggle("active", b.dataset.r === r));
-    document.getElementById("f-ident").hidden = r === "admin";
+    document.getElementById("f-ident").hidden = r === "admin" && !FB;
     document.getElementById("ident-l").textContent = labels[r];
     document.getElementById("err").textContent = "";
     document.getElementById("demo").innerHTML = Store.settings().demoHidden ? "" :
@@ -55,7 +67,7 @@
     e.preventDefault();
     const authRole = role === "etudiant" ? "student" : role;
     const u = await Auth.login(authRole, document.getElementById("ident").value, document.getElementById("pwd").value);
-    if (!u) { document.getElementById("err").textContent = "Identifiant ou mot de passe incorrect."; return; }
+    if (!u) { document.getElementById("err").textContent = Auth.lastError || "Identifiant ou mot de passe incorrect."; return; }
     Auth.start(authRole, u);
     location.href = { prof: "prof.html", etudiant: "etudiant.html", admin: "admin.html" }[role];
   };

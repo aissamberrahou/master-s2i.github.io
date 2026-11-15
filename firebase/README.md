@@ -61,13 +61,31 @@ La base Firestore `(default)` est déjà créée (europe-west1, mode production)
    Si vous le relancez, il ne remplace pas les documents déjà présents. Pour forcer le remplacement, ajoutez `--ecraser`.
 7. **Vérification** : dans Firestore Database › onglet *Données*, vous devez voir les collections `modules`, `profs`, `timetable`, etc.
 
+## Le site en mode Firebase
+
+Le site est branché sur ce projet (`assets/js/firebase-config.js`) :
+- **Connexion** : chacun se connecte avec son **adresse e-mail** et son mot de passe. Le lien « Mot de passe oublié ou premier accès ? » se trouve sur la page de connexion.
+- **Création des accès** : à l'import Excel des étudiants, à l'ajout d'un enseignant ou avec le bouton « Identifiants », la plateforme crée le compte et Firebase envoie un **e-mail d'activation** pour définir le mot de passe. Il faut donc une adresse e-mail pour chaque étudiant et chaque enseignant.
+- **Données partagées** en temps réel (messagerie en direct) et accès contrôlé par rôle grâce aux règles `firestore.rules`.
+
+### Texte de l'e-mail d'activation (à coller une fois dans la console)
+Dans **Authentication › Modèles › Réinitialisation du mot de passe**, cliquez sur le crayon. Choisissez la **langue du modèle : français**, puis collez :
+
+**Objet :** `Master S2I – Accès à votre compte sur la plateforme`
+
+**Message :**
+```html
+<p>Bonjour,</p>
+<p>Pour activer votre compte (%EMAIL%) sur la plateforme du <b>Master Systèmes Industriels Intelligents (S2I)</b> de l'ENSIAS, ou pour en réinitialiser le mot de passe, cliquez sur le lien ci-dessous et choisissez votre mot de passe :</p>
+<p><a href="%LINK%">Définir mon mot de passe</a></p>
+<p>Connectez-vous ensuite avec votre adresse e-mail.</p>
+<p><b>Espace Étudiant</b> : cours, TD, TP et devoirs publiés par vos enseignants ; suivi de vos absences ; emploi du temps de la semaine (présentiel ou à distance) ; notifications et planning de la coordination ; messagerie avec vos enseignants ; calendrier des examens et des soutenances.</p>
+<p><b>Espace Professeur</b> : saisie des absences (formations TN et TAM) ; gestion de vos cours, TD, TP et devoirs (publier, désactiver…) ; notification de vos étudiants ; emploi du temps et calendrier des examens.</p>
+<p>Si vous n'êtes pas concerné(e) par ce message, ignorez-le.</p>
+<p>La coordination du Master S2I – ENSIAS, Université Mohammed V de Rabat</p>
+```
+Dans **⚙ Paramètres du projet › Général › Nom public**, indiquez `Master S2I – ENSIAS` : c'est le nom d'expéditeur affiché dans les e-mails.
+
 ## Et ensuite ?
 
-Le site fonctionne encore en mode local, avec les données dans le navigateur. L'étape suivante est de le brancher sur ce projet :
-- connexion par Firebase Authentication (e-mail et mot de passe) ;
-- lecture et écriture dans Firestore selon le rôle ;
-- e-mail d'activation automatique à la création d'un compte.
-
-Il faudra pour cela la configuration Web du projet : ⚙ *Paramètres du projet* › *Vos applications* › *Application Web* › objet `firebaseConfig`.
-
-En attendant, ce même fichier `donnees-initiales.json` peut être chargé dans le site en mode local : Administration › Paramètres › *Restaurer depuis un fichier*. Le mot de passe administrateur est conservé.
+Pour repasser en mode démonstration (données dans le navigateur), mettez `window.FIREBASE_CONFIG = null;` dans `assets/js/firebase-config.js`. Ce même fichier `donnees-initiales.json` peut être chargé dans le site en mode local : Administration › Paramètres › *Restaurer depuis un fichier*. Le mot de passe administrateur est conservé.

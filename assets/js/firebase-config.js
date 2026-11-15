@@ -1,18 +1,14 @@
 /* ==========================================================================
-   Mode partagé (optionnel) — Firebase Firestore
-   Laissez FIREBASE_CONFIG à null : le site fonctionne en mode démonstration,
-   les données restent dans le navigateur de chaque utilisateur.
-   Pour que profs, étudiants et administrateur partagent les mêmes données,
-   collez ici la configuration de votre projet Firebase (voir README.md).
+   Configuration Firebase — projet master-s2i
+   Ces valeurs ne sont pas secrètes : elles identifient le projet. La sécurité
+   repose sur Firebase Authentication et les règles Firestore (firebase/firestore.rules).
+   Mettre FIREBASE_CONFIG à null pour revenir au mode démonstration (données dans le navigateur).
    ========================================================================== */
-window.FIREBASE_CONFIG = null;
-/* Exemple :
 window.FIREBASE_CONFIG = {
-  apiKey: "…",
+  apiKey: "AIzaSyBXITr_K6BRY3RqpbmCtij8hId_T7gdcW0",
   authDomain: "master-s2i.firebaseapp.com",
   projectId: "master-s2i",
-  storageBucket: "master-s2i.appspot.com",
-  messagingSenderId: "…",
-  appId: "…"
+  storageBucket: "master-s2i.firebasestorage.app",
+  messagingSenderId: "979748144628",
+  appId: "1:979748144628:web:334f5835797871650ae5a1"
 };
-*/

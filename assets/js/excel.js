@@ -121,7 +121,7 @@ function importStudentsDialog(onDone, defaults = {}) {
         <div><label>Formation (si absente du fichier)</label><select name="formation">${Object.entries(S2I.formations).map(([k, v]) => `<option value="${k}" ${defaults.formation === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div><label>Promotion (si absente)</label><input name="promotion" list="dl-promos" value="${esc(defaults.promotion || "")}" placeholder="ex. 2026-2028"><datalist id="dl-promos">${promos.map((p) => `<option value="${esc(p)}">`).join("")}</datalist></div>
         <div><label>Année (si absente)</label><select name="annee"><option value="1" ${defaults.annee == 2 ? "" : "selected"}>1re année</option><option value="2" ${defaults.annee == 2 ? "selected" : ""}>2e année</option></select></div>
-        <div><label>Mots de passe</label><select name="pwmode"><option value="random">Générer automatiquement (envoyés par e-mail)</option><option value="file">Colonne « Mot de passe » du fichier</option></select></div>
+        <div ${Store.mode === "firebase" ? "hidden" : ""}><label>Mots de passe</label><select name="pwmode"><option value="random">Générer automatiquement (envoyés par e-mail)</option><option value="file">Colonne « Mot de passe » du fichier</option></select></div>
         <div class="full checks"><label><input type="checkbox" name="update" checked> Mettre à jour les étudiants déjà inscrits (même code)</label></div>
       </div><div id="preview" style="margin-top:16px"></div>`,
     onSubmit: async (f) => {
@@ -153,7 +153,7 @@ function importStudentsDialog(onDone, defaults = {}) {
       if (!o.login && !o.nom) o.skip = true;
       else if (!o.login || !o.nom) o.error = "Code ou nom manquant";
       else if (seen.has(key)) o.error = "Code en double dans le fichier";
-      else if (f.pwmode.value === "file" && !o.password && !existing[key]) o.error = "Mot de passe manquant";
+      else if (Store.mode !== "firebase" && f.pwmode.value === "file" && !o.password && !existing[key]) o.error = "Mot de passe manquant";
       else o.status = existing[key] ? (f.update.checked ? "maj" : "ignore") : "nouveau";
       seen.add(key); return o;
     }).filter((o) => !o.skip);
@@ -174,6 +174,12 @@ function importStudentsDialog(onDone, defaults = {}) {
       const s = cur ? { ...cur } : { inactif: false };
       Object.assign(s, { login: o.login, nom: o.nom, prenom: o.prenom, formation: o.formation, promotion: o.promotion, annee: o.annee });
       if (o.email) s.email = o.email; else if (!cur) s.email = "";
+      if (Store.mode === "firebase") {
+        if (o.email) s.email = o.email.trim().toLowerCase();
+        const saved = await Store.putAwait("students", s);
+        if (saved.email && !saved.uid) items.push({ kind: "student", account: saved });
+        continue;
+      }
       let pw = f.pwmode.value === "file" ? o.password : "";
       if (!pw && !cur) pw = randomPassword();
       if (pw) { s.passHash = await hashPwd(pw); s.mustChange = true; }
@@ -182,6 +188,12 @@ function importStudentsDialog(onDone, defaults = {}) {
     }
     const nb = parsed.filter((x) => x.status === "nouveau" || x.status === "maj").length;
     UI.toast(`${nb} étudiant(s) importé(s).`);
+    if (Store.mode === "firebase") {
+      const noMail = parsed.filter((x) => (x.status === "nouveau" || x.status === "maj") && !x.email).length;
+      if (noMail) UI.toast(`${nb} étudiant(s) importé(s) — ${noMail} sans e-mail n'auront pas d'accès tant que l'e-mail n'est pas renseigné.`);
+      if (items.length) activateAccountsDialog(items, { title: `${items.length} accès étudiant(s) à créer — e-mails d'activation`, onClose: onDone });
+      return;
+    }
     if (items.length && typeof sendCredentialsDialog === "function")
       sendCredentialsDialog(items, { title: `${items.length} compte(s) étudiant créé(s) — envoyer les identifiants`, onClose: onDone });
   }

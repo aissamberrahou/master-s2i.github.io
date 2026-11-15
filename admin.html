@@ -21,6 +21,7 @@
 <script src="assets/js/admin-students.js"></script>
 <script src="assets/js/notifications.js"></script>
 <script src="assets/js/mailer.js"></script>
+<script src="assets/js/accounts.js"></script>
 <script>
 (async () => {
   await Store.init();
@@ -40,6 +41,13 @@
   let pendingPw = null;
   const withPassword = (col) => async (obj, isNew) => {
     if (!uniqueLogin(col)(obj)) return false;
+    if (Store.mode === "firebase") {
+      delete obj.password; pendingPw = null;
+      if (col === "students") obj.annee = Number(obj.annee);
+      obj.inactif = obj.inactif === "1" || obj.inactif === true;
+      if (obj.email) obj.email = obj.email.trim().toLowerCase();
+      return;
+    }
     pendingPw = obj.password || (isNew ? randomPassword() : null);
     if (pendingPw) { obj.passHash = await hashPwd(pendingPw); obj.mustChange = true; }
     delete obj.password;
@@ -47,6 +55,11 @@
     obj.inactif = obj.inactif === "1";
   };
   const credsAfterSave = (kind) => (obj, isNew) => {
+    if (Store.mode === "firebase") {
+      if (obj.email && !obj.uid) activateAccountsDialog([{ kind, account: obj }], { title: `Compte ${kind === "prof" ? "enseignant" : "étudiant"} — création de l'accès et e-mail d'activation` });
+      else if (!obj.email && isNew) UI.toast("Ajoutez une adresse e-mail pour créer l'accès à la plateforme.");
+      return;
+    }
     if (!pendingPw) return; const pw = pendingPw; pendingPw = null;
     sendCredentialsDialog([{ kind, account: obj, password: pw }], { title: isNew ? `Compte ${kind === "prof" ? "enseignant" : "étudiant"} créé — envoyer les identifiants` : "Mot de passe modifié — envoyer les nouveaux identifiants" });
   };
@@ -54,6 +67,10 @@
   const credsRowAction = (r) => `<button class="btn outline sm" data-creds="${r.id}" title="Générer un nouveau mot de passe provisoire et l'envoyer par e-mail">Identifiants</button> `;
   const bindCredsButtons = (box, kind, redraw) => $$("[data-creds]", box).forEach((b) => b.onclick = async () => {
     const col = kind === "prof" ? "profs" : "students"; const a = Store.get(col, b.dataset.creds);
+    if (Store.mode === "firebase") {
+      if (!UI.confirm(`${a.uid ? "Renvoyer" : "Créer l'accès et envoyer"} l'e-mail d'activation à ${a.prenom} ${a.nom} (${a.email || "pas d'e-mail"}) ?`)) return;
+      activateAccountsDialog([{ kind, account: a }], { onClose: redraw }); return;
+    }
     if (!UI.confirm(`Générer un nouveau mot de passe provisoire pour ${a.prenom} ${a.nom} et l'envoyer par e-mail ?\nL'ancien mot de passe ne fonctionnera plus.`)) return;
     sendCredentialsDialog([await resetCredentials(kind, a)], { onClose: redraw }); redraw();
   });
@@ -167,21 +184,22 @@
     }) },
     { id: "parametres", label: "Paramètres", render: (el) => {
       el.innerHTML = `<div class="page-head"><h1>Paramètres</h1></div><div class="grid grid-3">
-        <div class="card"><h3>Mot de passe administrateur</h3><form id="apw"><label>Nouveau mot de passe</label><input type="password" name="p1" minlength="8" required><label style="margin-top:10px">Confirmation</label><input type="password" name="p2" minlength="8" required><button class="btn" style="margin-top:12px">Modifier</button></form></div>
+        ${Store.mode === "firebase" ? `<div class="card"><h3>Mon mot de passe</h3><p class="muted">Compte administrateur : <b>${esc(Store.me.email)}</b>. Un lien pour changer le mot de passe vous sera envoyé par e-mail.</p><button class="btn" id="apwlink">Recevoir le lien</button></div>` : `<div class="card"><h3>Mot de passe administrateur</h3><form id="apw"><label>Nouveau mot de passe</label><input type="password" name="p1" minlength="8" required><label style="margin-top:10px">Confirmation</label><input type="password" name="p2" minlength="8" required><button class="btn" style="margin-top:12px">Modifier</button></form></div>`}
         <div class="card"><h3>Sauvegarde</h3><p class="muted">Exportez toutes les données (JSON) pour les archiver ou les transférer vers un autre navigateur.</p>
           <button class="btn" id="exp">Exporter les données</button><br><br><label>Restaurer depuis un fichier</label><input type="file" id="imp" accept=".json"></div>
-        <div class="card"><h3>Page de connexion</h3><label class="checks" style="margin-bottom:14px"><input type="checkbox" id="demoh" ${Store.settings().demoHidden ? "checked" : ""}> Masquer les comptes de démonstration</label>
-          <h3>Réinitialisation</h3><p class="muted">Remet le jeu de démonstration et efface toutes les données.</p><button class="btn danger" id="rst">Réinitialiser</button></div>
+        ${Store.mode === "firebase" ? `<div class="card"><h3>Base de données</h3><p class="muted">Mode <b>Firebase</b> (projet ${esc(window.FIREBASE_CONFIG.projectId)}) : les données sont partagées entre tous les utilisateurs.</p></div>` : `<div class="card"><h3>Page de connexion</h3><label class="checks" style="margin-bottom:14px"><input type="checkbox" id="demoh" ${Store.settings().demoHidden ? "checked" : ""}> Masquer les comptes de démonstration</label>
+          <h3>Réinitialisation</h3><p class="muted">Remet le jeu de démonstration et efface toutes les données.</p><button class="btn danger" id="rst">Réinitialiser</button></div>`}
         ${MailSettingsCards()}</div>`;
       bindMailSettings(el);
-      el.querySelector("#apw").onsubmit = async (e) => { e.preventDefault(); const f = e.target; if (f.p1.value !== f.p2.value) return UI.toast("Les deux mots de passe diffèrent.");
+      const lk = el.querySelector("#apwlink"); if (lk) lk.onclick = async () => { try { await Auth.resetPassword(Store.me.email); UI.toast("Lien envoyé à " + Store.me.email + "."); } catch (e) { UI.toast("Échec : " + e.message); } };
+      if (el.querySelector("#apw")) el.querySelector("#apw").onsubmit = async (e) => { e.preventDefault(); const f = e.target; if (f.p1.value !== f.p2.value) return UI.toast("Les deux mots de passe diffèrent.");
         Store.settings().adminHash = await hashPwd(f.p1.value); Store.saveSettings(); f.reset(); UI.toast("Mot de passe administrateur modifié."); };
       el.querySelector("#exp").onclick = () => downloadFile(`master-s2i-sauvegarde-${todayISO()}.json`, Store.exportJSON());
       el.querySelector("#imp").onchange = async (e) => { const file = e.target.files[0]; if (!file) return;
         try { const obj = JSON.parse(await file.text()); if (!obj.settings || !obj.students) throw new Error("format"); if (!UI.confirm("Remplacer toutes les données actuelles ?")) return; await Store.importJSON(obj); UI.toast("Données restaurées."); location.reload(); }
         catch { UI.toast("Fichier invalide."); } };
-      el.querySelector("#demoh").onchange = (e) => { Store.settings().demoHidden = e.target.checked; Store.saveSettings(); UI.toast("Enregistré."); };
-      el.querySelector("#rst").onclick = async () => { if (UI.confirm("Effacer toutes les données et revenir à la démonstration ?")) { await Store.reset(); Auth.logout(); } };
+      if (el.querySelector("#demoh")) el.querySelector("#demoh").onchange = (e) => { Store.settings().demoHidden = e.target.checked; Store.saveSettings(); UI.toast("Enregistré."); };
+      if (el.querySelector("#rst")) el.querySelector("#rst").onclick = async () => { if (UI.confirm("Effacer toutes les données et revenir à la démonstration ?")) { await Store.reset(); Auth.logout(); } };
     }}
   ];
   mountApp(user, "Administrateur · accès complet", views);
