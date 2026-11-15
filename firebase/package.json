@@ -1,0 +1,12 @@
+{
+  "name": "master-s2i-firestore-import",
+  "private": true,
+  "description": "Import des données initiales du Master S2I dans Firestore (projet ensias-master-s2i)",
+  "type": "module",
+  "scripts": {
+    "verifier": "node import-firestore.mjs --simulation"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

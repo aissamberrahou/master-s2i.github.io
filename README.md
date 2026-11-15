@@ -93,6 +93,9 @@ Ce mode sert à tester la plateforme. L'export et l'import JSON (Paramètres) pe
 ### Sécurité
 Les mots de passe sont hachés (SHA-256), mais la vérification se fait dans le navigateur. Cela suffit pour un usage interne. En mode Firebase, les règles Firestore doivent être restreintes avant une mise en production, idéalement avec Firebase Authentication. Le site ne doit pas contenir de données sensibles (notes officielles, données personnelles détaillées) tant que ce durcissement n'est pas fait.
 
+## Base de données Firestore (projet ensias-master-s2i)
+Le dossier [`firebase/`](firebase/) contient le modèle de données, les données initiales (offre 2026-2027, enseignants, emplois du temps S1), les règles de sécurité et le script d'import. La marche à suivre est dans [firebase/README.md](firebase/README.md).
+
 ## Publication sur GitHub Pages
 Settings → Pages → Source : *Deploy from a branch* → branche `main`, dossier `/ (root)`.
 Le site sera disponible à l'adresse `https://aissamberrahou.github.io/master-s2i/` (dépôt nommé `master-s2i`).

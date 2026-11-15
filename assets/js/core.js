@@ -91,6 +91,10 @@ const Store = {
   },
   exportJSON() { return JSON.stringify(this.data, null, 2); },
   async importJSON(obj) {
+    const keep = this.data && this.data.settings ? this.data.settings : {};
+    delete obj._meta; obj.settings = obj.settings || {};
+    // Ne pas perdre le mot de passe administrateur ni la configuration e-mail si le fichier ne les contient pas
+    ["adminHash", "email", "mailTemplates"].forEach((k) => { if (obj.settings[k] === undefined && keep[k] !== undefined) obj.settings[k] = keep[k]; });
     this.data = obj; this._ensure(); this._persist();
     if (this.mode === "firebase") await this._pushAll();
   },

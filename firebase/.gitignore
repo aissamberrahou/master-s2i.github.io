@@ -1,0 +1,6 @@
+# Ne jamais publier la clé du compte de service
+*-firebase-adminsdk-*.json
+cle*.json
+serviceAccount*.json
+node_modules/
+package-lock.json
