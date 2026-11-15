@@ -28,7 +28,7 @@
       <span class="muted">ou</span>
     </div>
     <form class="row" id="pwform">
-      <div><label>E-mail</label><input id="em" type="email" value="aissam.berrahou@gmail.com" autocomplete="username"></div>
+      <div><label>E-mail</label><input id="em" type="email" value="aissam.berrahou@ensias.um5.ac.ma" autocomplete="username"></div>
       <div><label>Mot de passe</label><input id="pw" type="password" autocomplete="current-password"></div>
       <button class="btn outline">Connexion e-mail</button>
     </form>
@@ -56,7 +56,7 @@ const firebaseConfig = {
   messagingSenderId: "979748144628",
   appId: "1:979748144628:web:334f5835797871650ae5a1"
 };
-const ADMIN_EMAIL = "aissam.berrahou@gmail.com";
+const ADMIN_EMAILS = ["aissam.berrahou@gmail.com", "aissam.berrahou@ensias.um5.ac.ma"];
 const COLLECTIONS = ["modules", "promotions", "profs", "students", "timetable", "sessions", "contents", "messages", "notifications", "exams", "soutenances"];
 
 firebase.initializeApp(firebaseConfig);
@@ -69,7 +69,7 @@ document.getElementById("google").onclick = () => auth.signInWithPopup(new fireb
 document.getElementById("pwform").onsubmit = (e) => { e.preventDefault(); auth.signInWithEmailAndPassword(em.value.trim(), pw.value).catch(err); };
 
 auth.onAuthStateChanged((u) => {
-  const ok = u && (u.email || "").toLowerCase() === ADMIN_EMAIL;
+  const ok = u && ADMIN_EMAILS.includes((u.email || "").toLowerCase());
   document.getElementById("who").innerHTML = u ? `Connecté : <b>${u.email}</b>${ok ? " ✅" : " — ce compte n'est pas celui du coordinateur."}` : "Non connecté.";
   document.getElementById("go").disabled = !ok;
   if (u) log(`Connecté : ${u.email} (uid ${u.uid})`);

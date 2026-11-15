@@ -29,7 +29,7 @@ service cloud.firestore {
       allow write: if isAdmin();
       // Amorçage : seul le compte du coordinateur peut se déclarer administrateur
       allow create: if signedIn() && request.auth.uid == uid
-                    && request.auth.token.email == "aissam.berrahou@gmail.com"
+                    && request.auth.token.email in ["aissam.berrahou@gmail.com", "aissam.berrahou@ensias.um5.ac.ma"]
                     && request.resource.data.role == "admin";
     }
 
