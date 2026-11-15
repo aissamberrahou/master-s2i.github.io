@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "description": "Données initiales de la plateforme du Master S2I (ENSIAS) — à importer dans Firestore (projet ensias-master-s2i)",
+    "description": "Données initiales de la plateforme du Master S2I (ENSIAS) — à importer dans Firestore (projet master-s2i)",
     "version": 1,
     "generatedAt": "2026-11-15T16:18:31.826Z",
     "anneeUniversitaire": "2026-2027"

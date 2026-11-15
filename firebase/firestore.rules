@@ -108,9 +108,10 @@ service cloud.firestore {
     match /messages/{id} {
       allow read: if isStaff()
                   || (isStudent() && (resource.data.section == me().section || resource.data.section == "ALL"));
-      allow create: if hasProfile() && request.resource.data.authorUid == request.auth.uid
-                  && (isStaff() || (request.resource.data.section == me().section && request.resource.data.module != "ALL"));
-      allow delete: if isAdmin();
+      allow create: if isAdmin()
+                  || (hasProfile() && request.resource.data.authorUid == request.auth.uid
+                      && (isProf() || (isStudent() && request.resource.data.section == me().section && request.resource.data.module != "ALL")));
+      allow update, delete: if isAdmin();
     }
   }
 }
