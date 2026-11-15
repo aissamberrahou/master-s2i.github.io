@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Import Firestore — Master S2I</title>
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+  .wrap { max-width: 820px; margin: 30px auto; padding: 0 16px; }
+  #log { background: #0f172a; color: #e2e8f0; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; padding: 14px; border-radius: 6px; min-height: 160px; white-space: pre-wrap; max-height: 420px; overflow-y: auto; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin: 12px 0; }
+  .row > div { flex: 1; min-width: 200px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <img src="../assets/img/logo-s2i.svg" alt="Master S2I" style="height:60px">
+  <h1>Import des données dans Firestore</h1>
+  <p class="muted">Projet Firebase <b>master-s2i</b>. Cette page écrit les données initiales (<code>donnees-initiales.json</code>) dans la base. Seul le compte du coordinateur peut l'utiliser. Les documents déjà présents sont conservés.</p>
+
+  <div class="card">
+    <h3>1. Connexion administrateur</h3>
+    <div id="who" class="muted">Non connecté.</div>
+    <div class="row">
+      <button class="btn" id="google">Se connecter avec Google</button>
+      <span class="muted">ou</span>
+    </div>
+    <form class="row" id="pwform">
+      <div><label>E-mail</label><input id="em" type="email" value="aissam.berrahou@gmail.com" autocomplete="username"></div>
+      <div><label>Mot de passe</label><input id="pw" type="password" autocomplete="current-password"></div>
+      <button class="btn outline">Connexion e-mail</button>
+    </form>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>2. Import</h3>
+    <label class="checks" style="margin-bottom:10px"><input type="checkbox" id="overwrite"> Remplacer les documents déjà présents (déconseillé)</label>
+    <button class="btn garnet" id="go" disabled>Importer les données</button>
+  </div>
+
+  <h3 style="margin-top:20px">Journal</h3>
+  <div id="log"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBXITr_K6BRY3RqpbmCtij8hId_T7gdcW0",
+  authDomain: "master-s2i.firebaseapp.com",
+  projectId: "master-s2i",
+  storageBucket: "master-s2i.firebasestorage.app",
+  messagingSenderId: "979748144628",
+  appId: "1:979748144628:web:334f5835797871650ae5a1"
+};
+const ADMIN_EMAIL = "aissam.berrahou@gmail.com";
+const COLLECTIONS = ["modules", "promotions", "profs", "students", "timetable", "sessions", "contents", "messages", "notifications", "exams", "soutenances"];
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth(), db = firebase.firestore();
+const logEl = document.getElementById("log");
+const log = (m) => { logEl.textContent += m + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+const err = (e) => log("❌ " + (e.code ? e.code + " — " : "") + (e.message || e));
+
+document.getElementById("google").onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err);
+document.getElementById("pwform").onsubmit = (e) => { e.preventDefault(); auth.signInWithEmailAndPassword(em.value.trim(), pw.value).catch(err); };
+
+auth.onAuthStateChanged((u) => {
+  const ok = u && (u.email || "").toLowerCase() === ADMIN_EMAIL;
+  document.getElementById("who").innerHTML = u ? `Connecté : <b>${u.email}</b>${ok ? " ✅" : " — ce compte n'est pas celui du coordinateur."}` : "Non connecté.";
+  document.getElementById("go").disabled = !ok;
+  if (u) log(`Connecté : ${u.email} (uid ${u.uid})`);
+});
+
+document.getElementById("go").onclick = async () => {
+  const btn = document.getElementById("go"); btn.disabled = true;
+  const overwrite = document.getElementById("overwrite").checked;
+  try {
+    const u = auth.currentUser;
+    const data = await fetch("donnees-initiales.json", { cache: "no-store" }).then((r) => r.json());
+    log(`Fichier chargé : ${data._meta.description}`);
+
+    // Profil administrateur
+    const uref = db.collection("users").doc(u.uid);
+    const usnap = await uref.get().catch(() => null);
+    if (!usnap || !usnap.exists) {
+      await uref.set({ role: "admin", refId: "admin", email: u.email, createdAt: new Date().toISOString() });
+      log("✅ Profil administrateur créé (users/" + u.uid + ")");
+    } else log("Profil administrateur déjà présent : rôle " + usnap.data().role);
+
+    let written = 0, kept = 0;
+    const writeCol = async (col, docs) => {
+      for (let i = 0; i < docs.length; i += 400) {
+        const chunk = docs.slice(i, i + 400);
+        const refs = chunk.map((d) => db.collection(col).doc(String(d.id)));
+        const snaps = overwrite ? [] : await Promise.all(refs.map((r) => r.get()));
+        const batch = db.batch(); let n = 0;
+        chunk.forEach((d, k) => { if (!overwrite && snaps[k].exists) { kept++; return; } batch.set(refs[k], d); n++; });
+        if (n) await batch.commit();
+        written += n;
+      }
+      log(`  ${col.padEnd(14)} ${docs.length} document(s)`);
+    };
+    for (const c of COLLECTIONS) if ((data[c] || []).length) await writeCol(c, data[c]);
+    await writeCol("config", [{ id: "settings", ...data.settings }]);
+    log(`\n✅ Import terminé : ${written} document(s) écrit(s), ${kept} déjà présent(s) conservé(s).`);
+  } catch (e) {
+    err(e);
+    if (e.code === "permission-denied") log("→ Vérifiez que les règles de firestore.rules sont publiées (Firestore › Règles › Publier).");
+  }
+  btn.disabled = false;
+};
+</script>
+</body>
+</html>

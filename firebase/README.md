@@ -1,6 +1,6 @@
 # Base de données Firestore — Master S2I
 
-Projet Firebase : **ensias-master-s2i**
+Projet Firebase : **master-s2i** (ID `master-s2i`, base `(default)` en `europe-west1`)
 
 Ce dossier contient tout ce qu'il faut pour créer la base de données de la plateforme :
 
@@ -33,9 +33,17 @@ Chaque collection Firestore correspond à une fonction du site. L'identifiant du
 
 Une section correspond à la formation et à l'année : `TN-1A`, `TAM-1A`, `TN-2A`, `TAM-2A`.
 
-## Créer la base (une seule fois, environ 15 minutes)
+## Méthode simple : la page d'import (sans clé ni Node.js)
 
-1. **Console Firebase** : ouvrez https://console.firebase.google.com puis le projet **ensias-master-s2i**.
+La base Firestore `(default)` est déjà créée (europe-west1, mode production) et la connexion par e-mail/mot de passe est activée. Il reste :
+1. Dans **Authentication › Méthode de connexion › Ajouter un fournisseur › Google**, cliquez sur *Activer*, choisissez votre e-mail d'assistance, puis *Enregistrer*.
+2. Dans **Authentication › Paramètres › Domaines autorisés › Ajouter un domaine**, ajoutez `aissamberrahou.github.io`.
+3. Dans **Firestore Database › Règles**, remplacez tout par le contenu de [`firestore.rules`](firestore.rules), puis cliquez sur *Publier*.
+4. Ouvrez la page **https://aissamberrahou.github.io/master-s2i.github.io/firebase/import.html**, cliquez sur *Se connecter avec Google* (compte aissam.berrahou@gmail.com), puis sur *Importer les données*.
+
+## Autre méthode : script Node.js avec clé de compte de service
+
+1. **Console Firebase** : ouvrez https://console.firebase.google.com puis le projet **master-s2i**.
 2. **Firestore Database** : cliquez sur *Créer une base de données*, choisissez une région en Europe (ex. `europe-west1`), puis le *mode production*.
 3. **Authentication** : cliquez sur *Commencer*, puis dans *Sign-in method*, activez *Adresse e-mail/Mot de passe*. Dans *Paramètres* › *Domaines autorisés*, ajoutez `aissamberrahou.github.io`.
 4. **Règles** : dans Firestore Database › onglet *Règles*, remplacez tout le contenu par celui de `firestore.rules`, puis cliquez sur *Publier*.

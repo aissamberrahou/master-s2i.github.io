@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Import des données initiales dans Firestore — projet ensias-master-s2i
+   Import des données initiales dans Firestore — projet master-s2i
 
    Utilisation (dans le dossier firebase/) :
      npm install
@@ -17,7 +17,7 @@ const flags = new Set(args.filter((a) => a.startsWith("--")));
 const [keyPath, adminEmail] = args.filter((a) => !a.startsWith("--"));
 const SIMULATION = flags.has("--simulation");
 const ECRASER = flags.has("--ecraser");
-const PROJECT = "ensias-master-s2i";
+const PROJECT = "master-s2i";
 
 const data = JSON.parse(readFileSync(new URL("./donnees-initiales.json", import.meta.url), "utf8"));
 const COLLECTIONS = ["modules", "promotions", "profs", "students", "timetable", "sessions", "contents", "messages", "notifications", "exams", "soutenances"];

@@ -2,7 +2,7 @@ rules_version = '2';
 
 // ===========================================================================
 //  Règles de sécurité Firestore — plateforme du Master S2I (ENSIAS)
-//  Projet Firebase : ensias-master-s2i
+//  Projet Firebase : master-s2i (site Hosting associé : ensias-master-s2i)
 //
 //  Principe : chaque compte Firebase Authentication possède un profil
 //  users/{uid} = { role: "admin" | "prof" | "student", refId, section, email }
@@ -27,6 +27,10 @@ service cloud.firestore {
     match /users/{uid} {
       allow read:  if signedIn() && (request.auth.uid == uid || isAdmin());
       allow write: if isAdmin();
+      // Amorçage : seul le compte du coordinateur peut se déclarer administrateur
+      allow create: if signedIn() && request.auth.uid == uid
+                    && request.auth.token.email == "aissam.berrahou@gmail.com"
+                    && request.resource.data.role == "admin";
     }
 
     // Paramètres généraux (année, sections, modèles d'e-mails…)
