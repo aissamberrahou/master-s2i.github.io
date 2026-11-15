@@ -142,6 +142,7 @@ const Store = {
     await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore-compat.js`);
     if (!firebase.apps.find((a) => a.name === "[DEFAULT]")) firebase.initializeApp(cfg);
     this.auth = firebase.auth(); this.fs = firebase.firestore();
+    this.auth.languageCode = "fr"; // e-mails Firebase (activation, mot de passe oublié) en français
     this.data = { settings: {} }; this._ensure();
     const user = await new Promise((res) => { const off = this.auth.onAuthStateChanged((u) => { off(); res(u); }); });
     if (!user) return;
