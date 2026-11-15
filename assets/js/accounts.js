@@ -16,8 +16,7 @@ const Accounts = {
     return this._creator;
   },
   loginUrl(kind) {
-    const base = Store.settings().siteUrl || location.href.replace(/[^/]*([?#].*)?$/, "");
-    return (base.endsWith("/") ? base : base + "/") + "connexion.html?role=" + (kind === "student" ? "etudiant" : "prof");
+    return siteBase() + "connexion.html?role=" + (kind === "student" ? "etudiant" : "prof");
   },
   /* Crée le compte s'il n'existe pas, relie le profil (rôle) et envoie l'e-mail d'activation */
   async activate(kind, account) {

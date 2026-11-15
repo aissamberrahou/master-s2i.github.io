@@ -266,7 +266,7 @@ const Auth = {
     return u && u.passHash === h ? u : null;
   },
   async resetPassword(email) {
-    const url = (Store.settings().siteUrl || location.href.replace(/[^/]*([?#].*)?$/, "")) + "connexion.html";
+    const url = siteBase() + "connexion.html";
     await Store.auth.sendPasswordResetEmail(email.trim(), { url });
   },
   start(role, user) { if (Store.mode !== "firebase") sessionStorage.setItem(this.KEY, JSON.stringify({ role, id: user.id })); },
@@ -319,6 +319,14 @@ const UI = {
   profName(id) { const p = Store.get("profs", id); return p ? `Pr. ${p.prenom} ${p.nom}` : "—"; },
   studentName(s) { return `${s.nom.toUpperCase()} ${s.prenom}`; }
 };
+
+/* Adresse publique du site (utilisée dans les e-mails et les liens d'activation) */
+const SITE_URL = "https://master-s2i.github.io/";
+function siteBase() {
+  let u = (Store.settings() || {}).siteUrl || "";
+  if (!u || /aissamberrahou\.github\.io\/master-s2i/.test(u)) u = /github\.io$/.test(location.hostname) ? SITE_URL : location.href.replace(/[^/]*([?#].*)?$/, "");
+  return u.endsWith("/") ? u : u + "/";
+}
 
 /* En-tête commun (logos + bandeau de navigation) */
 function renderHeader(active, user) {

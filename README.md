@@ -98,7 +98,7 @@ Le dossier [`firebase/`](firebase/) contient le modèle de données, les donnée
 
 ## Publication sur GitHub Pages
 Settings → Pages → Source : *Deploy from a branch* → branche `main`, dossier `/ (root)`.
-Le site sera disponible à l'adresse `https://aissamberrahou.github.io/master-s2i/` (dépôt nommé `master-s2i`).
+Le site est publié à l'adresse `https://master-s2i.github.io/` (organisation GitHub `master-s2i`, dépôt `master-s2i.github.io`).
 
 ## Structure
 ```

@@ -56,8 +56,7 @@ const Mailer = {
   cfg() { return Store.settings().email || {}; },
   configured() { const c = this.cfg(); return !!(c.serviceId && c.templateId && c.publicKey); },
   siteUrl() {
-    const u = Store.settings().siteUrl || location.href.replace(/[^/]*([?#].*)?$/, "");
-    return u.endsWith("/") ? u : u + "/";
+    return siteBase();
   },
   template(kind) { const t = (Store.settings().mailTemplates || {})[kind] || {}; return { subject: t.subject || MAIL_DEFAULTS[kind].subject, body: t.body || MAIL_DEFAULTS[kind].body }; },
   vars(item) {
@@ -160,7 +159,7 @@ function MailSettingsCards() {
       <div><label>Public Key</label><input name="publicKey" value="${esc(c.publicKey)}" placeholder="xxxxxxxxxxxxxxx"></div>
       <div><label>Nom de l'expéditeur</label><input name="fromName" value="${esc(c.fromName || "Coordination Master S2I")}"></div>
       <div><label>Adresse de réponse</label><input name="replyTo" type="email" value="${esc(c.replyTo)}" placeholder="coordination@…"></div>
-      <div><label>Adresse du site (dans les e-mails)</label><input name="siteUrl" type="url" value="${esc(s.siteUrl || Mailer.siteUrl())}"></div>
+      <div><label>Adresse du site (dans les e-mails)</label><input name="siteUrl" type="url" value="${esc(Mailer.siteUrl())}"></div>
       <div class="full toolbar"><button class="btn">Enregistrer</button><button type="button" class="btn outline" id="mailtest">Envoyer un e-mail de test</button>
         <span class="muted" id="mailstate">${Mailer.configured() ? "✅ Envoi automatique configuré" : "Envoi automatique non configuré"}</span></div></form></div>
   <div class="card" style="grid-column:1/-1"><h3>Modèles des e-mails</h3>

@@ -37,15 +37,15 @@ Une section correspond à la formation et à l'année : `TN-1A`, `TAM-1A`, `TN-2
 
 La base Firestore `(default)` est déjà créée (europe-west1, mode production) et la connexion par e-mail/mot de passe est activée. Il reste :
 1. Dans **Authentication › Méthode de connexion › Ajouter un fournisseur › Google**, cliquez sur *Activer*, choisissez votre e-mail d'assistance, puis *Enregistrer*.
-2. Dans **Authentication › Paramètres › Domaines autorisés › Ajouter un domaine**, ajoutez `aissamberrahou.github.io`.
+2. Dans **Authentication › Paramètres › Domaines autorisés › Ajouter un domaine**, ajoutez `master-s2i.github.io`.
 3. Dans **Firestore Database › Règles**, remplacez tout par le contenu de [`firestore.rules`](firestore.rules), puis cliquez sur *Publier*.
-4. Ouvrez la page **https://aissamberrahou.github.io/master-s2i.github.io/firebase/import.html**, cliquez sur *Se connecter avec Google* (compte aissam.berrahou@gmail.com), puis sur *Importer les données*.
+4. Ouvrez la page **https://master-s2i.github.io/firebase/import.html**, cliquez sur *Se connecter avec Google* (compte aissam.berrahou@gmail.com), puis sur *Importer les données*.
 
 ## Autre méthode : script Node.js avec clé de compte de service
 
 1. **Console Firebase** : ouvrez https://console.firebase.google.com puis le projet **master-s2i**.
 2. **Firestore Database** : cliquez sur *Créer une base de données*, choisissez une région en Europe (ex. `europe-west1`), puis le *mode production*.
-3. **Authentication** : cliquez sur *Commencer*, puis dans *Sign-in method*, activez *Adresse e-mail/Mot de passe*. Dans *Paramètres* › *Domaines autorisés*, ajoutez `aissamberrahou.github.io`.
+3. **Authentication** : cliquez sur *Commencer*, puis dans *Sign-in method*, activez *Adresse e-mail/Mot de passe*. Dans *Paramètres* › *Domaines autorisés*, ajoutez `master-s2i.github.io`.
 4. **Règles** : dans Firestore Database › onglet *Règles*, remplacez tout le contenu par celui de `firestore.rules`, puis cliquez sur *Publier*.
 5. **Clé du compte de service** : allez dans ⚙ *Paramètres du projet* › *Comptes de service* et cliquez sur *Générer une nouvelle clé privée*. Un fichier `.json` est téléchargé.
    ⚠️ Cette clé donne un accès complet au projet. Ne la publiez jamais sur GitHub et ne l'envoyez à personne.
