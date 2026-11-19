@@ -304,3 +304,25 @@ table.journal td { vertical-align: top; }
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 14px; }
 .filters .f { min-width: 160px; }
 .filters label { display: block; font-size: 12.5px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+
+/* Rappels de saisie des absences */
+.rappel-panel { border-color: #f3c2c8; }
+.rappel-panel .panel-h { background: #fdecee; color: var(--garnet); }
+tr.prefilled td { background: #fff7d6; transition: background .6s; }
+
+/* Plateformes de visioconférence */
+.btn.visio-btn { color: #fff; display: inline-flex; align-items: center; gap: 6px; }
+.btn.visio-btn:hover { filter: brightness(.92); }
+.pill.pf { display: inline-flex; align-items: center; gap: 4px; }
+.pill.pf .teams-ico { width: 13px; height: 13px; }
+.pf-card h3 { display: flex; align-items: center; gap: 8px; font-size: 17px; }
+.pf-card h3 .teams-ico { width: 20px; height: 20px; }
+.pf-choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pf-opt { position: relative; cursor: pointer; margin: 0; }
+.pf-opt input { position: absolute; opacity: 0; }
+.pf-opt span { display: flex; flex-direction: column; gap: 2px; border: 2px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--c); transition: .15s; }
+.pf-opt span small { color: var(--muted); font-weight: 400; }
+.pf-opt input:checked + span { border-color: var(--c); background: color-mix(in srgb, var(--c) 8%, #fff); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
+.board-step { background: #fff8ec; border-color: #f4dcb0; }
+.board-step .step-n { background: #e8a33d; }
+@media (max-width: 640px) { .pf-choice { grid-template-columns: 1fr; } }
