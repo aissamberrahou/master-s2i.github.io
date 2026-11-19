@@ -115,6 +115,12 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isProf() && resource.data.profId == me().refId);
     }
 
+    // Rappels de saisie des absences : créés par l'administrateur, lus par l'enseignant concerné.
+    match /rappels/{id} {
+      allow read: if isAdmin() || (isProf() && resource.data.profId == me().refId);
+      allow create, update, delete: if isAdmin();
+    }
+
     // Journal d'activité : chaque compte n'écrit que ses propres entrées (rôle vérifié) ;
     // seul l'administrateur peut le consulter ou le purger. Aucune modification possible.
     match /logs/{id} {
