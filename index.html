@@ -9,33 +9,102 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:wght@600;700&display=swap">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/home.css">
 <title>Master S2I — Systèmes Industriels Intelligents | ENSIAS</title>
 <meta name="description" content="Master Systèmes Industriels Intelligents (S2I) — ENSIAS, Université Mohammed V de Rabat. Présentation de la formation et espaces enseignants, étudiants et administration.">
 </head>
 <body>
 <div id="header"></div>
 
-<section class="hero">
+<section class="hero hero-3d">
+  <div id="hero3d" aria-hidden="true"><canvas id="hero2d"></canvas></div>
+  <div class="hero-shade"></div>
   <div class="wrap">
-    <div class="kicker">ENSIAS · Université Mohammed V de Rabat</div>
-    <h1>Master Systèmes Industriels Intelligents (S2I)</h1>
-    <p>Une formation de deux ans au croisement de l'intelligence artificielle, des systèmes embarqués, de la robotique et de l'Industrie 4.0.</p>
-    <div class="cta">
+    <div class="kicker reveal">ENSIAS · Université Mohammed V de Rabat</div>
+    <h1 class="reveal">Master <span class="grad">Systèmes Industriels Intelligents</span> (S2I)</h1>
+    <p class="reveal">Une formation de deux ans au croisement de l'intelligence artificielle, des systèmes embarqués, de la robotique et de l'Industrie 4.0.</p>
+    <div class="rotator reveal" aria-live="polite"><span class="rot-label">Au programme :</span> <span class="rot-word" id="rot-word">Robotique collaborative</span><span class="caret"></span></div>
+    <div class="cta reveal">
       <a class="btn light" href="#programme">Découvrir le programme</a>
       <a class="btn ghost" href="#espaces">Accéder à mon espace</a>
     </div>
-  
   </div>
-  
+  <ul class="hero-legend" aria-hidden="true">
+    <li><i style="background:#e4513f"></i>Robot réel</li><li><i style="background:#38d9f5"></i>Jumeau numérique</li><li><i style="background:#ffc64d"></i>Edge AI</li><li><i style="background:#f4f6fb"></i>Réalité virtuelle</li>
+  </ul>
+  <a class="scroll-hint" href="#technologies" aria-label="Descendre"><span></span></a>
+</section>
+
+<div class="tech-marquee" aria-hidden="true"><div class="track">
+  <span>Robotique</span><span>ROS 2</span><span>Jumeaux numériques</span><span>Réalité virtuelle</span><span>Edge AI</span><span>Vision par ordinateur</span><span>Deep Learning</span><span>IoT industriel</span><span>Systèmes embarqués</span><span>Cybersécurité</span><span>Cloud et DevOps</span><span>Industrie 4.0</span>
+  <span>Robotique</span><span>ROS 2</span><span>Jumeaux numériques</span><span>Réalité virtuelle</span><span>Edge AI</span><span>Vision par ordinateur</span><span>Deep Learning</span><span>IoT industriel</span><span>Systèmes embarqués</span><span>Cybersécurité</span><span>Cloud et DevOps</span><span>Industrie 4.0</span>
+</div></div>
+
+<section class="section" id="technologies">
+  <h2 class="reveal">Les technologies au cœur du Master</h2>
+  <p class="lead reveal">Concevoir, simuler et piloter l'usine intelligente : du capteur au cloud, du robot à son double virtuel.</p>
+  <div class="tech-grid">
+    <article class="tech-card reveal" style="--c:#e4513f">
+      <div class="tech-visual">
+        <svg viewBox="0 0 200 140" class="v-robot" aria-hidden="true">
+          <ellipse cx="70" cy="128" rx="46" ry="6" class="shadow"/>
+          <rect x="44" y="112" width="52" height="14" rx="4" class="dark"/>
+          <g class="arm1"><rect x="62" y="56" width="16" height="60" rx="7" class="metal"/><circle cx="70" cy="112" r="11" class="joint"/>
+            <g class="arm2"><rect x="66" y="50" width="70" height="13" rx="6" class="metal"/><circle cx="70" cy="56" r="9" class="joint"/>
+              <g class="grip"><circle cx="134" cy="56" r="6" class="joint"/><rect x="128" y="62" width="4" height="16" rx="2" class="dark f1"/><rect x="137" y="62" width="4" height="16" rx="2" class="dark f2"/></g></g></g>
+          <rect x="150" y="112" width="18" height="14" rx="2" class="box"/>
+        </svg>
+      </div>
+      <h3>Robotique</h3><p>Bras industriels et robots collaboratifs, commande, perception et programmation (ROS 2).</p>
+    </article>
+    <article class="tech-card reveal" style="--c:#7c5cff">
+      <div class="tech-visual vr-visual">
+        <div class="cube3d"><div class="f fr"></div><div class="f bk"></div><div class="f lt"></div><div class="f rt"></div><div class="f tp"></div><div class="f bt"></div></div>
+        <svg viewBox="0 0 200 140" class="v-vr" aria-hidden="true">
+          <path d="M40 58 Q40 40 60 40 H140 Q160 40 160 58 V86 Q160 102 142 102 H120 Q110 102 104 92 Q100 86 96 92 Q90 102 80 102 H58 Q40 102 40 86 Z" class="shell"/>
+          <circle cx="74" cy="72" r="15" class="lens"/><circle cx="126" cy="72" r="15" class="lens"/>
+          <rect x="44" y="44" width="112" height="3" class="scanline"/>
+        </svg>
+      </div>
+      <h3>Réalité virtuelle et augmentée</h3><p>Formation immersive, maintenance assistée et visualisation 3D des lignes de production.</p>
+    </article>
+    <article class="tech-card reveal" style="--c:#1fb6d5">
+      <div class="tech-visual">
+        <svg viewBox="0 0 200 140" class="v-twin" aria-hidden="true">
+          <defs><path id="twinpath" d="M58 70 C80 20 120 20 142 70"/></defs>
+          <g class="gear g-real"><path d="M58 40 l6 0 2 8 7 3 7-5 4 4-5 7 3 7 8 2 0 6-8 2-3 7 5 7-4 4-7-5-7 3-2 8-6 0-2-8-7-3-7 5-4-4 5-7-3-7-8-2 0-6 8-2 3-7-5-7 4-4 7 5 7-3z"/><circle cx="61" cy="70" r="9" class="hole"/></g>
+          <g class="gear g-twin"><path d="M139 40 l6 0 2 8 7 3 7-5 4 4-5 7 3 7 8 2 0 6-8 2-3 7 5 7-4 4-7-5-7 3-2 8-6 0-2-8-7-3-7 5-4-4 5-7-3-7-8-2 0-6 8-2 3-7-5-7 4-4 7 5 7-3z"/><circle cx="142" cy="70" r="9" class="hole"/></g>
+          <use href="#twinpath" class="flow"/>
+          <circle r="3.5" class="pkt"><animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#twinpath"/></animateMotion></circle>
+          <circle r="3.5" class="pkt"><animateMotion dur="1.8s" begin="-0.6s" repeatCount="indefinite"><mpath href="#twinpath"/></animateMotion></circle>
+          <circle r="3.5" class="pkt"><animateMotion dur="1.8s" begin="-1.2s" repeatCount="indefinite"><mpath href="#twinpath"/></animateMotion></circle>
+          <text x="61" y="122" text-anchor="middle">réel</text><text x="142" y="122" text-anchor="middle">virtuel</text>
+        </svg>
+      </div>
+      <h3>Jumeaux numériques</h3><p>Modéliser et simuler les équipements en temps réel pour prévoir, optimiser et piloter à distance.</p>
+    </article>
+    <article class="tech-card reveal" style="--c:#ffb020">
+      <div class="tech-visual">
+        <svg viewBox="0 0 200 140" class="v-edge" aria-hidden="true">
+          <g class="traces"><path d="M100 70 H20"/><path d="M100 70 H180"/><path d="M100 70 V10"/><path d="M100 70 V130"/><path d="M100 70 L30 20"/><path d="M100 70 L170 120"/><path d="M100 70 L170 20"/><path d="M100 70 L30 120"/></g>
+          <g class="pulses"><path d="M100 70 H20"/><path d="M100 70 H180"/><path d="M100 70 V10"/><path d="M100 70 V130"/><path d="M100 70 L30 20"/><path d="M100 70 L170 120"/><path d="M100 70 L170 20"/><path d="M100 70 L30 120"/></g>
+          <rect x="70" y="40" width="60" height="60" rx="8" class="chip"/>
+          <rect x="84" y="54" width="32" height="32" rx="4" class="core"/>
+          <text x="100" y="74" text-anchor="middle" class="ai">AI</text>
+        </svg>
+      </div>
+      <h3>IA embarquée (Edge AI)</h3><p>Déployer la vision et l'apprentissage profond au plus près des machines, sur cartes embarquées.</p>
+    </article>
+  </div>
 </section>
 
 <section class="section" id="presentation">
-  <h2>Présentation de la formation</h2>
+  <h2 class="reveal">Présentation de la formation</h2>
   <p class="lead">Offre de formation <span class="annee"></span></p>
   <div class="grid grid-3">
-    <div class="card accent"><h3>Objectif</h3><p>Former des cadres capables de concevoir, programmer et déployer des systèmes industriels intelligents : acquisition de données, commande, IA embarquée, vision, IoT et jumeaux numériques.</p></div>
-    <div class="card accent"><h3>Compétences visées</h3><p>Programmation avancée et embarquée, modélisation et simulation, data science, apprentissage profond, robotique, cybersécurité, cloud et DevOps, conception de systèmes (Design Thinking, UML/SysML).</p></div>
-    <div class="card accent"><h3>Organisation</h3><p>Trois semestres de modules (techniques, langue et soft skills), puis un semestre consacré au projet de fin d'études. Deux formules : formation initiale (TN) et formation à temps aménagé (TAM).</p></div>
+    <div class="card accent reveal"><h3>Objectif</h3><p>Former des cadres capables de concevoir, programmer et déployer des systèmes industriels intelligents : acquisition de données, commande, IA embarquée, vision, IoT et jumeaux numériques.</p></div>
+    <div class="card accent reveal"><h3>Compétences visées</h3><p>Programmation avancée et embarquée, modélisation et simulation, data science, apprentissage profond, robotique, cybersécurité, cloud et DevOps, conception de systèmes (Design Thinking, UML/SysML).</p></div>
+    <div class="card accent reveal"><h3>Organisation</h3><p>Trois semestres de modules (techniques, langue et soft skills), puis un semestre consacré au projet de fin d'études. Deux formules : formation initiale (TN) et formation à temps aménagé (TAM).</p></div>
   </div>
 </section>
 
@@ -50,13 +119,13 @@
   <h2>Espaces de la plateforme</h2>
   <p class="lead">Chaque espace est protégé par un identifiant et un mot de passe.</p>
   <div class="grid grid-3">
-    <div class="card space-card"><div class="ico"><img src="assets/img/favicon.svg" alt="Master S2I"><span class="role" aria-hidden="true">👨‍🏫</span></div><h3>Espace Professeur</h3>
+    <div class="card space-card reveal tilt"><div class="ico"><img src="assets/img/favicon.svg" alt="Master S2I"><span class="role" aria-hidden="true">👨‍🏫</span></div><h3>Espace Professeur</h3>
       <ul><li>Saisie des absences (TN et TAM)</li><li>Cours, TD, TP et devoirs : ajouter, modifier, supprimer, publier, désactiver</li><li>Notification des étudiants par messagerie</li><li>Emploi du temps et calendrier des examens</li></ul>
       <a class="btn" href="prof.html">Accéder</a></div>
-    <div class="card space-card"><div class="ico"><img src="assets/img/favicon.svg" alt="Master S2I"><span class="role" aria-hidden="true">🎓</span></div><h3>Espace Étudiant</h3>
+    <div class="card space-card reveal tilt"><div class="ico"><img src="assets/img/favicon.svg" alt="Master S2I"><span class="role" aria-hidden="true">🎓</span></div><h3>Espace Étudiant</h3>
       <ul><li>Contenus pédagogiques publiés</li><li>Suivi de ses absences</li><li>Emploi du temps et notifications</li><li>Calendrier des examens et des soutenances</li></ul>
       <a class="btn" href="etudiant.html">Accéder</a></div>
-    <div class="card space-card"><div class="ico"><img src="assets/img/favicon.svg" alt="Master S2I"><span class="role" aria-hidden="true">⚙️</span></div><h3>Espace Administrateur</h3>
+    <div class="card space-card reveal tilt"><div class="ico"><img src="assets/img/favicon.svg" alt="Master S2I"><span class="role" aria-hidden="true">⚙️</span></div><h3>Espace Administrateur</h3>
       <ul><li>Accès complet à la plateforme</li><li>Étudiants, enseignants et modules</li><li>Emploi du temps, examens et soutenances</li><li>Sauvegarde et restauration des données</li></ul>
       <a class="btn" href="admin.html">Accéder</a></div>
   </div>
@@ -90,5 +159,7 @@ document.querySelectorAll(".annee").forEach((e) => (e.textContent = S2I.annee));
     + sem(4) + `<tr><td class="mod pfe" colspan="7">Projet de fin d'études (PFE)</td></tr>`;
 })();
 </script>
+<script src="assets/js/home.js"></script>
+<script type="module" src="assets/js/home3d.js"></script>
 </body>
 </html>

@@ -24,6 +24,8 @@
 <script src="assets/js/mailer.js"></script>
 <script src="assets/js/accounts.js"></script>
 <script src="assets/js/journal.js"></script>
+<script src="assets/js/visio.js"></script>
+<script src="assets/js/rappels.js"></script>
 <script>
 (async () => {
   await Store.init();
@@ -113,6 +115,7 @@
         { key: "titre", label: "Intitulé", required: true, full: true }],
       beforeSave: (o, isNew) => { o.sem = Number(o.sem); if (isNew) { if (Store.get("modules", o.code)) { UI.toast("Ce code existe déjà."); return false; } o.id = o.code; } else if (o.code !== o.id) { UI.toast("Le code d'un module existant ne peut pas être modifié."); return false; } }
     }) },
+    { id: "suivi", label: "Suivi de la saisie des absences", badge: () => Suivi.slots(shiftISO(todayISO(), -14)).filter((x) => !x.ok).length, render: (el) => SuiviAbsencesAdmin(el) },
     { id: "absences", label: "Absences", render: (el) => AttendanceView(el, { modules: allMods().filter((c) => c !== "PFE"), profId: null }) },
     { id: "contenus", label: "Contenus pédagogiques", render: (el) => ContentsView(el, { modules: allMods(), profId: null, user }) },
     { id: "notifications", label: "Notifications (Planning)", render: (el) => NotificationsAdmin(el) },

@@ -19,6 +19,7 @@
 <script src="assets/js/core.js"></script>
 <script src="assets/js/components.js"></script>
 <script src="assets/js/visio.js"></script>
+<script src="assets/js/rappels.js"></script>
 <script>
 (async () => {
   await Store.init();
@@ -36,6 +37,7 @@
       const cont = Store.all("contents").filter((c) => c.profId === user.id);
       const today = [...Store.all("timetable"), ...Visio.slots()].filter((t) => t.profId === user.id && +t.jour === ((new Date().getDay() + 6) % 7) + 1 && slotInWeek(t, mondayOf())).sort((a, b) => a.debut.localeCompare(b.debut));
       el.innerHTML = `<div class="page-head"><h1>Bonjour, Pr. ${esc(user.prenom)} ${esc(user.nom)}</h1></div>
+        ${profRemindersPanel(user.id)}
         <div class="grid grid-4" style="margin-bottom:24px">
           <div class="stat"><b>${mods.length}</b><span>Module(s) enseigné(s)</span></div>
           <div class="stat"><b>${sess.length}</b><span>Séance(s) d'appel</span></div>
@@ -44,11 +46,12 @@
         <div class="grid grid-3">
           <div class="card"><h3>Mes modules</h3><ul class="list-plain">${mods.map((c) => `<li>${esc(UI.moduleLabel(c))}</li>`).join("") || "<li class='muted'>Aucun module affecté.</li>"}</ul></div>
           <div class="card"><h3>Mes cours aujourd'hui</h3><ul class="list-plain">${today.map((t) => `<li><b>${t.debut}–${t.fin}</b> · ${esc(t.module)} · ${t.section}<div class="muted">${t.mode === "distance" ? "" : esc(t.salle)} ${modePill(t.mode, t.lien)}</div></li>`).join("") || "<li class='muted'>Aucun cours aujourd'hui.</li>"}</ul>
-            <a class="btn sm" href="#absences" style="margin-top:12px">Saisir une absence</a> <a class="btn outline sm" href="#visio" style="margin-top:12px">Planifier une séance Teams</a></div>
+            <a class="btn sm" href="#absences" style="margin-top:12px">Saisir une absence</a> <a class="btn outline sm" href="#visio" style="margin-top:12px">Planifier une séance à distance</a></div>
           <div class="card"><h3>Messages non lus</h3><p><b style="font-size:28px;color:var(--navy)">${Chat.totalUnread(ctxUser, channels)}</b></p><a class="btn outline sm" href="#messagerie">Ouvrir la messagerie</a></div></div>`;
+      bindProfReminders(el, user.id);
     }},
-    { id: "visio", label: "Séances à distance (Teams)", render: (el) => ProfVisioView(el, { user, modules: mods, profId: user.id }) },
-    { id: "absences", label: "Absences", render: (el) => AttendanceView(el, { modules: mods, profId: user.id }) },
+    { id: "visio", label: "Séances à distance", render: (el) => ProfVisioView(el, { user, modules: mods, profId: user.id }) },
+    { id: "absences", label: "Absences", badge: () => profPending(user.id).filter((x) => x.reminded).length, render: (el) => AttendanceView(el, { modules: mods, profId: user.id }) },
     { id: "contenus", label: "Contenus pédagogiques", render: (el) => ContentsView(el, { modules: mods, profId: user.id, user }) },
     { id: "messagerie", label: "Messagerie", badge: () => Chat.totalUnread(ctxUser, channels), render: (el) => ChatView(el, { user: ctxUser, role: "prof", channels, onRead: () => refreshBadges(views) }) },
     { id: "edt", label: "Emploi du temps", render: (el) => TimetableView(el, { sections: sectionsMine, profId: user.id, title: "Mon emploi du temps" }) },

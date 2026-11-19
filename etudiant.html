@@ -46,7 +46,7 @@
           <div class="stat" style="border-left-color:var(--garnet)"><b>${abs}</b><span>Absence(s) non justifiée(s)</span></div>
           <div class="stat"><b>${Notif.unread(user) + Chat.totalUnread(ctxUser, channels)}</b><span>Notification(s) / message(s) non lu(s)</span></div>
           <div class="stat"><b style="font-size:18px">${nextExam ? fmtDate(nextExam.date) : "—"}</b><span>${nextExam ? "Prochain examen : " + esc(nextExam.module) : "Aucun examen programmé"}</span></div></div>
-        ${(() => { const nx = Visio.forSection(sec).filter((v) => v.statut !== "annulee" && !Visio.isPast(v)).slice(0, 3); return nx.length ? `<div class="panel"><div class="panel-h">🎥 Prochaines séances à distance (Teams)</div><div class="panel-b">${nx.map(visioCard).join("")}<a class="btn outline sm" href="#visio">Toutes les séances à distance</a></div></div>` : ""; })()}
+        ${(() => { const nx = Visio.forSection(sec).filter((v) => v.statut !== "annulee" && !Visio.isPast(v)).slice(0, 3); return nx.length ? `<div class="panel"><div class="panel-h">🎥 Prochaines séances à distance</div><div class="panel-b">${nx.map(visioCard).join("")}<a class="btn outline sm" href="#visio">Toutes les séances à distance</a></div></div>` : ""; })()}
         <div class="panel"><div class="panel-h">📌 Annonces de la coordination</div><div class="panel-b">
           ${(() => { const r = Notif.readSet(user); const l = Notif.forStudent(user).slice(0, 3); return l.length ? l.map((n) => notifCard(n, !r.has(n.id))).join("") : "<p class='muted'>Aucune annonce.</p>"; })()}
           <a class="btn outline sm" href="#notifications">Toutes les notifications</a></div></div>
