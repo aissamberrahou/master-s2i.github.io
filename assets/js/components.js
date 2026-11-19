@@ -6,6 +6,8 @@
    ctx : { modules: [codes], profId: id|null (null = admin, toutes séances) } */
 function AttendanceView(el, ctx) {
   const st = { module: ctx.modules[0], tab: "today", cal: { y: new Date().getFullYear(), m: new Date().getMonth() } };
+  const pre = AttendanceView.prefill; AttendanceView.prefill = null;
+  if (pre && ctx.modules.includes(pre.module)) st.module = pre.module;
   if (!st.module) { el.innerHTML = `<div class="alert warn">Aucun module ne vous est affecté. Contactez l'administrateur.</div>`; return; }
 
   const sessionsOf = () => Store.all("sessions").filter((s) => s.module === st.module && (!ctx.profId || s.profId === ctx.profId))
@@ -117,6 +119,12 @@ function AttendanceView(el, ctx) {
     downloadFile(`absences_${st.module}.csv`, "﻿" + csv, "text/csv");
   };
   draw();
+  if (pre && st.module === pre.module) {
+    const set = (id, v) => { const x = $(id, el); if (x && v) x.value = v; };
+    set("#n-sec", pre.section); set("#n-date", pre.date); set("#n-from", pre.debut); set("#n-to", pre.fin); set("#n-mode", pre.mode);
+    const row = $("#n-create", el).closest("tr"); row.classList.add("prefilled"); row.scrollIntoView({ behavior: "smooth", block: "center" });
+    UI.toast("Séance préremplie : vérifiez puis cliquez sur « Créer la feuille ».");
+  }
 }
 
 /* ---------- Contenus pédagogiques ----------
@@ -269,7 +277,7 @@ function TimetableView(el, { sections, profId, title = "Emploi du temps", onWeek
         return `<div class="day ${date === todayISO() ? "today" : ""}"><h4>${j}<small>${fmtDate(date)}</small></h4>${rows.filter((r) => +r.jour === i + 1).sort((a, b) => a.debut.localeCompare(b.debut))
         .map((r) => `<div class="slot ${r.mode === "distance" ? "dist" : ""}"><span class="t">${r.debut} – ${r.fin}</span><b>${esc(r.module)}</b>${esc((Store.get("modules", r.module) || {}).titre || "")}
           <div class="muted">${r.mode === "distance" ? "" : esc(r.salle)}${profId ? ` · ${r.section}` : UI.teacherOf(r) ? ` · ${esc(UI.teacherOf(r))}` : ""}</div>
-          <div style="margin-top:4px">${modePill(r.mode, r.lien)}${r.visio ? ' <span class="pill t-cours">Teams</span>' : r.semaine ? ' <span class="pill draft" title="Séance propre à cette semaine">ponctuelle</span>' : ""}</div></div>`).join("") || '<div class="muted" style="text-align:center">—</div>'}</div>`; }).join("")}</div></div>`
+          <div style="margin-top:4px">${modePill(r.mode, r.lien)}${r.visio ? ` <span class="pill t-cours">${esc(((typeof PLATFORMS !== "undefined" && PLATFORMS[r.plateforme]) || { court: "Visio" }).court)}</span>` : r.semaine ? ' <span class="pill draft" title="Séance propre à cette semaine">ponctuelle</span>' : ""}</div></div>`).join("") || '<div class="muted" style="text-align:center">—</div>'}</div>`; }).join("")}</div></div>`
       : `<div class="alert info">Aucune séance programmée pour cette semaine.</div>`}`;
     const s = $("#tt-sec", el); if (s) s.onchange = (e) => { st.section = e.target.value; draw(); };
     $$("[data-w]", el).forEach((b) => b.onclick = () => { const n = +b.dataset.w; TTWeek.monday = n ? shiftISO(TTWeek.monday, n) : mondayOf(); draw(); if (onWeek) onWeek(); });

@@ -1,7 +1,7 @@
 /* ==========================================================================
    Noyau : stockage, authentification, utilitaires d'interface
    ========================================================================== */
-const COLS = ["profs", "students", "contents", "sessions", "messages", "timetable", "exams", "soutenances", "modules", "notifications", "visios"];
+const COLS = ["profs", "students", "contents", "sessions", "messages", "timetable", "exams", "soutenances", "modules", "notifications", "visios", "rappels"];
 const DB_KEY = "s2i_db_v1";
 
 /* ---------------- Utilitaires ---------------- */
@@ -169,7 +169,7 @@ const Store = {
     const conf = await this.fs.collection("config").doc("settings").get();
     this.data = { settings: conf.exists ? conf.data() : {} };
     if (r === "admin" || r === "prof") {
-      await Promise.all(COLS.map(async (c) => { this.data[c] = await col(c); }));
+      await Promise.all(COLS.map(async (c) => { this.data[c] = r === "prof" && c === "rappels" ? docs(await this.fs.collection(c).where("profId", "==", this.me.refId).get()) : await col(c); }));
     } else if (r === "student") {
       await Promise.all(["modules", "profs", "timetable", "exams", "soutenances", "notifications", "visios"].map(async (c) => { this.data[c] = await col(c); }));
       const own = await this.fs.collection("students").doc(this.me.refId).get();
@@ -305,7 +305,7 @@ const Auth = {
    Chaque action (connexion, consultation, création, modification, suppression)
    est enregistrée dans la collection « logs » (lisible par l'administrateur seul). */
 const LOG_LABELS = { contents: "Contenu pédagogique", sessions: "Feuille de présence", messages: "Message", visios: "Séance Teams", timetable: "Créneau d'emploi du temps",
-  students: "Fiche étudiant", profs: "Fiche enseignant", modules: "Module", notifications: "Notification", exams: "Examen", soutenances: "Soutenance" };
+  students: "Fiche étudiant", profs: "Fiche enseignant", modules: "Module", notifications: "Notification", exams: "Examen", soutenances: "Soutenance", rappels: "Rappel de saisie des absences" };
 const Journal = {
   queue: [], timer: null, _lastView: "",
   who() {
@@ -334,6 +334,7 @@ const Journal = {
       case "notifications": return `« ${s(o.titre)} »`;
       case "exams": return `${s(o.module)} · ${s(o.section)} · ${fmtDate(o.date)}`;
       case "soutenances": return `${s(o.etudiant)} · ${fmtDate(o.date)}`;
+      case "rappels": { const p = Store.get("profs", o.profId); return `${p ? `Pr. ${p.prenom} ${p.nom}` : ""} · ${(o.items || []).length} séance(s)${o.email ? " · avec e-mail" : ""}`; }
       default: return s(o.titre || o.code || o.id);
     }
   },
